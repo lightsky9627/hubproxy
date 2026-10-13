@@ -252,26 +252,24 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 
 	handleRegistryRequest(c, path)
 
-	// 记录拉取日志 (只记录最终 200 状态，或者带 Authorization 时的真实结果，过滤握手探测 401)
-	if strings.Contains(path, "/manifests/") {
+	// 记录拉取日志 (保留原汁原味日志，记录每次真实请求)
+	if strings.Contains(path, "/manifests/") || strings.Contains(path, "/blobs/") {
 		status := c.Writer.Status()
-		if status == http.StatusOK || (authHeader != "" && status >= 400) {
-			pathWithoutV2 := strings.TrimPrefix(path, "/v2/")
-			target, targetPath := resolveRegistryTarget(c, pathWithoutV2)
-			imageName, apiType, _ := parseRegistryPath(targetPath)
-			if imageName != "" {
-				duration := time.Since(start).Milliseconds()
-				go db.RecordPullLog(db.PullLog{
-					Username:   username,
-					ClientIP:   c.ClientIP(),
-					Registry:   target.Name,
-					Image:      imageName,
-					Action:     apiType,
-					Status:     status,
-					DurationMs: duration,
-					UserAgent:  c.Request.UserAgent(),
-				})
-			}
+		pathWithoutV2 := strings.TrimPrefix(path, "/v2/")
+		target, targetPath := resolveRegistryTarget(c, pathWithoutV2)
+		imageName, apiType, _ := parseRegistryPath(targetPath)
+		if imageName != "" {
+			duration := time.Since(start).Milliseconds()
+			go db.RecordPullLog(db.PullLog{
+				Username:   username,
+				ClientIP:   c.ClientIP(),
+				Registry:   target.Name,
+				Image:      imageName,
+				Action:     apiType,
+				Status:     status,
+				DurationMs: duration,
+				UserAgent:  c.Request.UserAgent(),
+			})
 		}
 	}
 }
@@ -566,6 +564,7 @@ func proxyRegistryHTTP(c *gin.Context, target registryTarget, upstreamPath strin
 					return
 				}
 			}
+			// 如果服务端请求重定向目标失败，则保留 Location 返回给客户端自行尝试
 		}
 	}
 

@@ -1,651 +1,687 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HubProxy - 管理控制台</title>
-    <link rel="icon" href="/favicon.ico">
-    <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --card-border: #334155;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --danger: #ef4444;
-            --success: #10b981;
-            --radius: 8px;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HubProxy Console 控制台</title>
+  <link rel="icon" href="/favicon.ico">
+  <!-- Tailwind CSS & Lucide Icons via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            line-height: 1.5;
-            padding: 20px;
-        }
-        .container { max-width: 1200px; margin: 0 auto; }
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--card-border);
-            margin-bottom: 24px;
-        }
-        .logo-area { display: flex; align-items: center; gap: 10px; }
-        .logo-area h1 { font-size: 20px; font-weight: 700; }
-        .nav-tabs { display: flex; gap: 8px; }
-        .nav-btn {
-            background: transparent;
-            color: var(--text-muted);
-            border: 1px solid transparent;
-            padding: 8px 16px;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        .nav-btn:hover { color: var(--text); background: var(--card); }
-        .nav-btn.active { background: var(--primary); color: #fff; }
-        
-        .card {
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: var(--radius);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-        .stat-card {
-            background: rgba(255,255,255,0.02);
-            border: 1px solid var(--card-border);
-            border-radius: var(--radius);
-            padding: 16px;
-        }
-        .stat-card .title { font-size: 13px; color: var(--text-muted); }
-        .stat-card .value { font-size: 24px; font-weight: 700; margin-top: 6px; color: var(--primary); }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--card-border); }
-        th { color: var(--text-muted); font-weight: 600; }
-        tr:hover td { background: rgba(255,255,255,0.02); }
-
-        .btn {
-            background: var(--primary);
-            color: #fff;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .btn:hover { background: var(--primary-hover); }
-        .btn-danger { background: var(--danger); }
-        .btn-sm { padding: 4px 8px; font-size: 12px; }
-
-        .form-group { margin-bottom: 14px; }
-        .form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
-        .form-control {
-            width: 100%;
-            padding: 8px 12px;
-            background: #090d16;
-            border: 1px solid var(--card-border);
-            border-radius: 4px;
-            color: #fff;
-            font-size: 14px;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-        .modal.show { display: flex; }
-        .modal-body {
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: var(--radius);
-            width: 100%;
-            max-width: 480px;
-            padding: 24px;
-        }
-        .badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .badge-success { background: rgba(16,185,129,0.2); color: #34d399; }
-        .badge-danger { background: rgba(239,68,68,0.2); color: #f87171; }
-        .badge-info { background: rgba(59,130,246,0.2); color: #60a5fa; }
-    </style>
+      }
+    }
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 9999px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; }
+  </style>
 </head>
-<body>
-    <div class="container" id="app">
-        <!-- 登录面板 -->
-        <div id="loginView" style="max-width: 400px; margin: 100px auto;" class="card">
-            <h2 style="margin-bottom: 16px; text-align: center;">管理员登录</h2>
-            <div class="form-group">
-                <label>管理员账号</label>
-                <input type="text" id="loginUser" class="form-control" value="admin">
-            </div>
-            <div class="form-group">
-                <label>管理员密码</label>
-                <input type="password" id="loginPass" class="form-control" placeholder="默认密码: admin123456">
-            </div>
-            <button class="btn" style="width: 100%; padding: 10px;" onclick="doLogin()">立即登录</button>
-            <div id="loginError" style="color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center;"></div>
+<body class="bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col antialiased transition-colors duration-200">
+
+  <!-- Topbar -->
+  <header class="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sticky top-0 z-30 select-none shadow-sm">
+    <div class="flex items-center space-x-6">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-blue-500/30">
+          <i data-lucide="layers" class="w-5 h-5"></i>
         </div>
-
-        <!-- 主面板 -->
-        <div id="mainView" style="display: none;">
-            <header>
-                <div class="logo-area">
-                    <h1>🐳 HubProxy 控制台</h1>
-                    <span id="currentAdmin" class="badge badge-info">admin</span>
-                </div>
-                <div class="nav-tabs">
-                    <button class="nav-btn active" onclick="switchTab('dashboard')">概览看板</button>
-                    <button class="nav-btn" onclick="switchTab('users')">用户与配额</button>
-                    <button class="nav-btn" onclick="switchTab('upstreams')">DockerHub上游</button>
-                    <button class="nav-btn" onclick="switchTab('logs')">拉取日志</button>
-                    <button class="nav-btn" onclick="switchTab('settings')">防滥用设置</button>
-                    <button class="nav-btn btn-danger" onclick="doLogout()">退出</button>
-                </div>
-            </header>
-
-            <!-- 概览看板 -->
-            <div id="tab-dashboard" class="tab-pane">
-                <div class="grid-4">
-                    <div class="stat-card">
-                        <div class="title">今日镜像拉取</div>
-                        <div class="value" id="statToday">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="title">本月累计拉取</div>
-                        <div class="value" id="statMonth">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="title">总拉取记录</div>
-                        <div class="value" id="statTotal">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="title">注册用户数</div>
-                        <div class="value" id="statUsers">0</div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin-top: 20px;">
-                    <h3>客户端连接指引</h3>
-                    <p style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">
-                        创建用户后，用户可在本地终端通过该账号登录你的代理站，直接拉取镜像：
-                    </p>
-                    <pre style="background: #090d16; padding: 12px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 13px; color: #a5b4fc;" id="clientGuide">
-docker login &lt;your-domain&gt; -u &lt;username&gt; -p &lt;password&gt;
-docker pull &lt;your-domain&gt;/library/nginx:latest
-docker pull &lt;your-domain&gt;/redis:alpine
-                    </pre>
-                </div>
-            </div>
-
-            <!-- 用户管理 -->
-            <div id="tab-users" class="tab-pane" style="display: none;">
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>用户账号管理</h3>
-                        <button class="btn" onclick="openUserModal()">+ 新建用户</button>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>用户名</th>
-                                <th>当月已用 / 配额上限</th>
-                                <th>角色</th>
-                                <th>状态</th>
-                                <th>备注</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="userTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 上游凭证管理 -->
-            <div id="tab-upstreams" class="tab-pane" style="display: none;">
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h3>Docker Hub 官方账号池</h3>
-                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                                配置你自己的 Docker Hub 账号/PAT。当用户匿名或以代理账号拉取时，HubProxy 会使用此凭据向上游拉取，享受无限制或付费高额度。
-                            </p>
-                        </div>
-                        <button class="btn" onclick="openUpstreamModal()">+ 添加上游凭据</button>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Registry</th>
-                                <th>账号 / 用户名</th>
-                                <th>状态</th>
-                                <th>更新时间</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="upstreamTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 拉取日志 -->
-            <div id="tab-logs" class="tab-pane" style="display: none;">
-                <div class="card">
-                    <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                        <input type="text" id="logKeyword" class="form-control" style="max-width: 260px;" placeholder="搜索镜像或IP..." onkeyup="if(event.key==='Enter')loadLogs()">
-                        <button class="btn" onclick="loadLogs()">搜索</button>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>时间</th>
-                                <th>账号</th>
-                                <th>客户端 IP</th>
-                                <th>目标 Registry</th>
-                                <th>镜像名称</th>
-                                <th>动作</th>
-                                <th>状态码</th>
-                                <th>耗时</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 系统设置 -->
-            <div id="tab-settings" class="tab-pane" style="display: none;">
-                <div class="card" style="max-width: 600px;">
-                    <h3 style="margin-bottom: 16px;">防滥用安全策略</h3>
-                    <div class="form-group">
-                        <label>允许匿名未登录拉取</label>
-                        <select id="cfg_allow_anonymous" class="form-control">
-                            <option value="true">允许 (适合公共镜像站，配合月度限额)</option>
-                            <option value="false">禁止 (必须通过 docker login 本地账号才允许拉取)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>匿名用户每月拉取上限 (按 IP 计数)</label>
-                        <input type="number" id="cfg_anonymous_monthly_quota" class="form-control" placeholder="0 为不限制，默认 50">
-                    </div>
-                    <div class="form-group">
-                        <label>允许未知用户透传 Docker Hub</label>
-                        <select id="cfg_allow_passthrough" class="form-control">
-                            <option value="true">允许 (未在本地注册的 docker hub 账号透传验证)</option>
-                            <option value="false">禁止 (仅允许本地数据库注册账号)</option>
-                        </select>
-                    </div>
-                    <button class="btn" onclick="saveSettings()">保存配置</button>
-                </div>
-            </div>
+        <div class="flex items-baseline space-x-2">
+          <span class="font-bold text-base tracking-tight text-slate-900 dark:text-white">HubProxy</span>
+          <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">Console</span>
         </div>
+      </div>
 
-        <!-- 用户编辑弹窗 -->
-        <div class="modal" id="userModal">
-            <div class="modal-body">
-                <h3 id="userModalTitle" style="margin-bottom: 16px;">新建用户</h3>
-                <input type="hidden" id="modalUserId">
-                <div class="form-group">
-                    <label>用户名</label>
-                    <input type="text" id="modalUsername" class="form-control">
-                </div>
-                <div class="form-group">
-                    <label>密码 (留空则不修改)</label>
-                    <input type="password" id="modalPassword" class="form-control">
-                </div>
-                <div class="form-group">
-                    <label>每月拉取次数限额 (0 表示不限)</label>
-                    <input type="number" id="modalMonthlyQuota" class="form-control" value="100">
-                </div>
-                <div class="form-group">
-                    <label>是否启用</label>
-                    <select id="modalIsEnabled" class="form-control">
-                        <option value="true">启用</option>
-                        <option value="false">禁用</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>是否为管理员</label>
-                    <select id="modalIsAdmin" class="form-control">
-                        <option value="false">普通用户</option>
-                        <option value="true">管理员</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>备注</label>
-                    <input type="text" id="modalRemark" class="form-control">
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button class="btn" style="background: #475569;" onclick="closeModal('userModal')">取消</button>
-                    <button class="btn" onclick="submitUserForm()">保存</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 上游凭证弹窗 -->
-        <div class="modal" id="upstreamModal">
-            <div class="modal-body">
-                <h3 style="margin-bottom: 16px;">配置上游凭据</h3>
-                <div class="form-group">
-                    <label>目标 Registry</label>
-                    <input type="text" id="upstreamRegistry" class="form-control" value="docker.io">
-                </div>
-                <div class="form-group">
-                    <label>官方用户名</label>
-                    <input type="text" id="upstreamUsername" class="form-control">
-                </div>
-                <div class="form-group">
-                    <label>密码 / PAT Token</label>
-                    <input type="password" id="upstreamPassword" class="form-control">
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button class="btn" style="background: #475569;" onclick="closeModal('upstreamModal')">取消</button>
-                    <button class="btn" onclick="submitUpstreamForm()">保存</button>
-                </div>
-            </div>
-        </div>
+      <nav class="hidden md:flex items-center space-x-1 text-sm font-medium text-slate-600 dark:text-slate-300">
+        <a href="/" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">首页</a>
+        <a href="/images.html" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">镜像</a>
+        <a href="/search.html" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">搜索</a>
+        <a href="https://github.com/lightsky9627/hubproxy" target="_blank" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">文档</a>
+      </nav>
     </div>
 
-    <script>
-        let token = localStorage.getItem('hubproxy_admin_token') || '';
+    <div class="flex items-center space-x-3">
+      <!-- Dark mode switch -->
+      <button id="themeToggle" class="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+        <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+        <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+      </button>
 
-        function checkAuth() {
-            if (token) {
-                document.getElementById('loginView').style.display = 'none';
-                document.getElementById('mainView').style.display = 'block';
-                loadStats();
-                updateClientGuide();
-            } else {
-                document.getElementById('loginView').style.display = 'block';
-                document.getElementById('mainView').style.display = 'none';
-            }
+      <!-- Admin User Tag -->
+      <div class="flex items-center space-x-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+        <div class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold text-xs border border-blue-200 dark:border-blue-800">
+          A
+        </div>
+        <span class="text-xs font-medium text-slate-700 dark:text-slate-200 hidden sm:inline" id="topUserDisplay">Admin</span>
+        <button onclick="logoutAdmin()" class="text-xs text-rose-500 hover:text-rose-600 ml-1 p-1 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded" title="退出登录">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Wrap -->
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-60 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between transition-all duration-300 z-20 shrink-0">
+      <div class="p-3 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+        <!-- Space card -->
+        <div class="p-2.5 rounded-lg border border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-md bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+              P
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-400 font-medium leading-none">管理空间</div>
+              <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-1 leading-none truncate max-w-[100px]" id="spaceName">Default</div>
+            </div>
+          </div>
+          <i data-lucide="chevrons-up-down" class="w-4 h-4 text-slate-400"></i>
+        </div>
+
+        <!-- Menu Groups -->
+        <div class="space-y-4 text-xs select-none">
+          <div>
+            <div class="px-2 mb-1.5 font-medium text-slate-400 dark:text-slate-500 text-[11px]">概览</div>
+            <button onclick="switchTab('overview')" class="nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition" data-tab="overview">
+              <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+              <span>概览</span>
+            </button>
+          </div>
+
+          <div>
+            <div class="px-2 mb-1.5 font-medium text-slate-400 dark:text-slate-500 text-[11px]">开发者服务</div>
+            <div class="space-y-0.5">
+              <button onclick="switchTab('keys')" class="nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition" data-tab="keys">
+                <i data-lucide="key" class="w-4 h-4"></i>
+                <span>密钥管理</span>
+              </button>
+              <button onclick="switchTab('upstreams')" class="nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-blue-600 bg-blue-50/70 dark:bg-blue-950/40 dark:text-blue-400 transition" data-tab="upstreams">
+                <i data-lucide="link-2" class="w-4 h-4"></i>
+                <span>上游账号</span>
+              </button>
+              <button onclick="switchTab('logs')" class="nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition" data-tab="logs">
+                <i data-lucide="scroll-text" class="w-4 h-4"></i>
+                <span>拉取日志</span>
+              </button>
+              <button onclick="switchTab('domains')" class="nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition" data-tab="domains">
+                <i data-lucide="globe" class="w-4 h-4"></i>
+                <span>专属域名</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="px-2 mb-1.5 font-medium text-slate-400 dark:text-slate-500 text-[11px]">安全与配额</div>
+            <div class="space-y-0.5">
+              <button onclick="switchTab('settings')" class="nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition" data-tab="settings">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>策略与防刷</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collapse Toggle -->
+      <div class="p-3 border-t border-slate-200 dark:border-slate-800">
+        <button id="collapseBtn" class="w-full flex items-center space-x-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
+          <i data-lucide="chevrons-left" class="w-4 h-4"></i>
+          <span id="collapseText">收起导航</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Stage -->
+    <main class="flex-1 overflow-y-auto custom-scrollbar p-6 bg-[#f8fafc] dark:bg-slate-950">
+      
+      <!-- ====================== TAB: 上游账号 (默认展示与原图完全一致) ====================== -->
+      <div id="tab-upstreams" class="tab-pane max-w-6xl mx-auto space-y-6">
+        <div class="flex items-start justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">上游账号</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">保存目标镜像平台的读取凭据，自动代为认证上游，突破 Docker Hub 匿名限制或拉取私有镜像。</p>
+            <div class="text-[11px] text-slate-400 mt-2">支持 Docker Hub、GHCR、Quay 等，停用仍占名额。密码与密钥保存后无法查看，可随时替换。</div>
+          </div>
+          <button onclick="openAddUpstreamModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm shadow-blue-500/20 flex items-center space-x-1.5 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>添加账号</span>
+          </button>
+        </div>
+
+        <!-- Notice -->
+        <div class="p-3 bg-slate-100/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-600 dark:text-slate-300 flex items-center space-x-2">
+          <i data-lucide="info" class="w-4 h-4 text-blue-500 shrink-0"></i>
+          <span>配置 Docker Hub 上游凭据后，本服务端将代表所有经认证用户换取官方高配额 Token，彻底杜绝 429 Rate Limit。</span>
+        </div>
+
+        <!-- List or Empty State -->
+        <div id="upstreamListContainer" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm min-h-[300px] flex flex-col justify-center items-center">
+          <div class="text-center py-10 space-y-2">
+            <div class="w-12 h-12 mx-auto rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+              <i data-lucide="key" class="w-6 h-6"></i>
+            </div>
+            <div class="font-semibold text-sm text-slate-700 dark:text-slate-200">尚未添加上游账号</div>
+            <div class="text-xs text-slate-400">先添加平台凭据，系统拉取该平台时将自动附加认证凭证。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== TAB: 概览 (Overview) ====================== -->
+      <div id="tab-overview" class="tab-pane hidden max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">控制台概览</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">系统运行状态、资源用量与拉取吞吐统计</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+            <div class="text-xs text-slate-400 font-medium">总注册用户</div>
+            <div class="text-2xl font-bold text-slate-800 dark:text-white mt-2" id="statUsers">-</div>
+            <div class="text-[11px] text-slate-400 mt-1">具备私有拉取凭证</div>
+          </div>
+          <div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+            <div class="text-xs text-slate-400 font-medium">总拉取次数 (日志)</div>
+            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2" id="statPulls">-</div>
+            <div class="text-[11px] text-slate-400 mt-1">累计请求计数</div>
+          </div>
+          <div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+            <div class="text-xs text-slate-400 font-medium">上游活跃凭据</div>
+            <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2" id="statCreds">-</div>
+            <div class="text-[11px] text-slate-400 mt-1">DockerHub / 官方池</div>
+          </div>
+          <div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+            <div class="text-xs text-slate-400 font-medium">匿名访问策略</div>
+            <div class="text-2xl font-bold text-slate-800 dark:text-white mt-2" id="statAnon">-</div>
+            <div class="text-[11px] text-slate-400 mt-1">防滥用控制</div>
+          </div>
+        </div>
+
+        <!-- Quick guide -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-3">
+          <h2 class="text-sm font-bold text-slate-800 dark:text-white">🚀 Docker 客户端快速接入</h2>
+          <div class="p-3 bg-slate-900 text-slate-100 rounded-lg text-xs font-mono select-all overflow-x-auto space-y-1">
+            <div class="text-slate-400"># 1. 登录本私有代理服务</div>
+            <div>docker login <span class="current-host text-amber-400">hub.example.com</span> -u <span class="text-emerald-400">your_username</span></div>
+            <div class="text-slate-400 pt-2"># 2. 满速安全拉取（自动突破限制）</div>
+            <div>docker pull <span class="current-host text-amber-400">hub.example.com</span>/library/nginx:latest</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== TAB: 密钥管理 (用户与凭证) ====================== -->
+      <div id="tab-keys" class="tab-pane hidden max-w-6xl mx-auto space-y-6">
+        <div class="flex items-start justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">密钥管理</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">管理专属拉取账号、密码凭证及每月配额（拉取次数限额）。</p>
+          </div>
+          <button onclick="openAddUserModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm shadow-blue-500/20 flex items-center space-x-1.5 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>新建密钥 / 用户</span>
+          </button>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th class="py-3 px-4 font-semibold">用户名 / 标识</th>
+                  <th class="py-3 px-4 font-semibold">角色</th>
+                  <th class="py-3 px-4 font-semibold">状态</th>
+                  <th class="py-3 px-4 font-semibold">本月已用 / 配额上限</th>
+                  <th class="py-3 px-4 font-semibold">有效期至</th>
+                  <th class="py-3 px-4 font-semibold text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody id="userTableBody" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <!-- 动态填充 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== TAB: 拉取日志 ====================== -->
+      <div id="tab-logs" class="tab-pane hidden max-w-6xl mx-auto space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">拉取日志</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">完整透明记录客户端请求审计、耗时及状态。</p>
+          </div>
+          <button onclick="loadLogs()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-200 hover:bg-slate-50 flex items-center space-x-1 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>刷新</span>
+          </button>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th class="py-3 px-4 font-semibold">时间</th>
+                  <th class="py-3 px-4 font-semibold">账号</th>
+                  <th class="py-3 px-4 font-semibold">客户端 IP</th>
+                  <th class="py-3 px-4 font-semibold">平台</th>
+                  <th class="py-3 px-4 font-semibold">镜像</th>
+                  <th class="py-3 px-4 font-semibold">动作</th>
+                  <th class="py-3 px-4 font-semibold">状态</th>
+                  <th class="py-3 px-4 font-semibold text-right">耗时</th>
+                </tr>
+              </thead>
+              <tbody id="logsTableBody" class="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
+                <!-- 动态填充 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== TAB: 专属域名 ====================== -->
+      <div id="tab-domains" class="tab-pane hidden max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">专属域名 & Nginx 配置</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">推荐在前面挂载 Nginx 反向代理配置 SSL 证书，并传递真实客户端 IP。</p>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
+          <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">标准 Nginx 反向代理配置示例：</div>
+          <pre class="bg-slate-900 text-slate-100 p-4 rounded-lg text-xs font-mono overflow-x-auto leading-relaxed">server {
+    listen 443 ssl http2;
+    server_name <span class="current-host text-amber-400">hub.example.com</span>;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+
+    client_max_body_size 0;
+    chunked_transfer_encoding on;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 900s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}</pre>
+        </div>
+      </div>
+
+      <!-- ====================== TAB: 策略与防刷 (Settings) ====================== -->
+      <div id="tab-settings" class="tab-pane hidden max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">安全与防滥用策略</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">控制匿名拉取权限、限制单 IP 拉取阈值、保障服务稳定。</p>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm space-y-6 max-w-2xl">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">允许匿名用户拉取</div>
+              <div class="text-xs text-slate-400 mt-0.5">关闭后，所有客户端拉取前必须使用 docker login 登录</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="settingAllowAnonymous" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          <div class="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-2">
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-200">匿名 IP 每月拉取上限 (次)</label>
+            <input type="number" id="settingAnonQuota" class="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500" placeholder="50">
+            <div class="text-[11px] text-slate-400">单个客户端 IP 当月拉取 Manifest 超出此数值将直接拒绝（429 Too Many Requests）</div>
+          </div>
+
+          <div class="border-t border-slate-100 dark:border-slate-800 pt-5">
+            <button onclick="saveSettings()" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm shadow-blue-500/20 transition">
+              保存策略配置
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Modal: 添加上游账号 -->
+  <div id="addUpstreamModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">添加上游账号凭证</h3>
+        <button onclick="closeModal('addUpstreamModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="addUpstreamForm" onsubmit="submitAddUpstream(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700 dark:text-slate-200 mb-1">目标 Registry 平台</label>
+          <select id="upstreamTarget" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500">
+            <option value="docker.io">Docker Hub (docker.io)</option>
+            <option value="ghcr.io">GitHub Container Registry (ghcr.io)</option>
+            <option value="quay.io">Quay.io</option>
+            <option value="gcr.io">Google Container Registry (gcr.io)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 dark:text-slate-200 mb-1">平台用户名 / 账号</label>
+          <input type="text" id="upstreamUsername" required placeholder="例如：your_docker_username" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 dark:text-slate-200 mb-1">密码 / Personal Access Token</label>
+          <input type="password" id="upstreamPassword" required placeholder="平台密码或 Token" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500">
+          <div class="text-[11px] text-slate-400 mt-1">Docker Hub 建议填写 Personal Access Token (PAT)。</div>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('addUpstreamModal')" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">取消</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium">确认添加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: 添加用户 -->
+  <div id="addUserModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">新建拉取账号 / 密钥</h3>
+        <button onclick="closeModal('addUserModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="addUserForm" onsubmit="submitAddUser(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700 dark:text-slate-200 mb-1">用户名 (docker login -u)</label>
+          <input type="text" id="newUsername" required placeholder="如：team-ci / dev01" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 dark:text-slate-200 mb-1">密码</label>
+          <input type="password" id="newPassword" required placeholder="设置拉取密码" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 dark:text-slate-200 mb-1">每月额度限制 (次)</label>
+          <input type="number" id="newQuota" value="500" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500">
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('addUserModal')" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">取消</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium">确认创建</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // Theme Handler
+    const themeBtn = document.getElementById('themeToggle');
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    themeBtn.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    });
+
+    // Populate current host
+    document.querySelectorAll('.current-host').forEach(el => el.textContent = window.location.host);
+
+    // Tab switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+      const activePane = document.getElementById('tab-' + tabId);
+      if (activePane) activePane.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-item').forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabId) {
+          btn.className = "nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-blue-600 bg-blue-50/70 dark:bg-blue-950/40 dark:text-blue-400 transition";
+        } else {
+          btn.className = "nav-item w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition";
         }
+      });
 
-        async function doLogin() {
-            const user = document.getElementById('loginUser').value;
-            const pass = document.getElementById('loginPass').value;
-            const errDiv = document.getElementById('loginError');
-            errDiv.innerText = '';
+      if (tabId === 'upstreams') loadUpstreams();
+      if (tabId === 'overview') loadOverview();
+      if (tabId === 'keys') loadUsers();
+      if (tabId === 'logs') loadLogs();
+      if (tabId === 'settings') loadSettings();
+    }
 
-            try {
-                const res = await fetch('/api/admin/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    token = data.token;
-                    localStorage.setItem('hubproxy_admin_token', token);
-                    document.getElementById('currentAdmin').innerText = data.username;
-                    checkAuth();
-                } else {
-                    errDiv.innerText = data.error || '登录失败';
-                }
-            } catch (e) {
-                errDiv.innerText = '网络异常: ' + e.message;
-            }
+    // Modal helpers
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function openAddUpstreamModal() { openModal('addUpstreamModal'); }
+    function openAddUserModal() { openModal('addUserModal'); }
+
+    // Sidebar collapse
+    let isCollapsed = false;
+    document.getElementById('collapseBtn').addEventListener('click', () => {
+      const sb = document.getElementById('sidebar');
+      const text = document.getElementById('collapseText');
+      isCollapsed = !isCollapsed;
+      if (isCollapsed) {
+        sb.classList.remove('w-60');
+        sb.classList.add('w-16');
+        text.classList.add('hidden');
+      } else {
+        sb.classList.remove('w-16');
+        sb.classList.add('w-60');
+        text.classList.remove('hidden');
+      }
+    });
+
+    // API Handlers
+    async function loadUpstreams() {
+      try {
+        const res = await fetch('/api/admin/upstreams');
+        if (res.status === 401) return location.reload();
+        const data = await res.json();
+        const container = document.getElementById('upstreamListContainer');
+        if (!data || data.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-10 space-y-2">
+              <div class="w-12 h-12 mx-auto rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                <i data-lucide="key" class="w-6 h-6"></i>
+              </div>
+              <div class="font-semibold text-sm text-slate-700 dark:text-slate-200">尚未添加上游账号</div>
+              <div class="text-xs text-slate-400">先添加平台凭据，系统拉取该平台时将自动附加认证凭证。</div>
+            </div>`;
+        } else {
+          container.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+              ${data.map(u => `
+                <div class="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 flex items-start justify-between">
+                  <div class="flex items-start space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
+                      ${u.registry.substring(0,2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-800 dark:text-white">${u.registry}</div>
+                      <div class="text-[11px] text-slate-500 font-mono mt-0.5">${u.username}</div>
+                      <div class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span>已激活代拉取</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button onclick="deleteUpstream(${u.id})" class="text-slate-400 hover:text-rose-500 p-1">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              `).join('')}
+            </div>`;
         }
+        lucide.createIcons();
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
-        function doLogout() {
-            token = '';
-            localStorage.removeItem('hubproxy_admin_token');
-            checkAuth();
-        }
+    async function submitAddUpstream(e) {
+      e.preventDefault();
+      const payload = {
+        registry: document.getElementById('upstreamTarget').value,
+        username: document.getElementById('upstreamUsername').value,
+        password: document.getElementById('upstreamPassword').value,
+      };
+      const res = await fetch('/api/admin/upstreams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        closeModal('addUpstreamModal');
+        document.getElementById('addUpstreamForm').reset();
+        loadUpstreams();
+      } else {
+        alert('添加失败');
+      }
+    }
 
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + tabId).style.display = 'block';
-            event.target.classList.add('active');
+    async function deleteUpstream(id) {
+      if (!confirm('确定删除该上游凭据？')) return;
+      await fetch('/api/admin/upstreams/' + id, { method: 'DELETE' });
+      loadUpstreams();
+    }
 
-            if (tabId === 'dashboard') loadStats();
-            if (tabId === 'users') loadUsers();
-            if (tabId === 'upstreams') loadUpstreams();
-            if (tabId === 'logs') loadLogs();
-            if (tabId === 'settings') loadSettings();
-        }
+    async function loadUsers() {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = (data || []).map(u => `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="py-3 px-4 font-semibold text-slate-800 dark:text-slate-100">${u.username}</td>
+          <td class="py-3 px-4 text-slate-500">${u.is_admin ? '<span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-semibold">管理员</span>' : '<span class="text-slate-400">标准用户</span>'}</td>
+          <td class="py-3 px-4">${u.is_enabled ? '<span class="text-emerald-500 font-medium">启用</span>' : '<span class="text-rose-500 font-medium">禁用</span>'}</td>
+          <td class="py-3 px-4 font-mono">${u.used_quota_month} / ${u.monthly_quota}</td>
+          <td class="py-3 px-4 text-slate-400">${u.expires_at ? new Date(u.expires_at).toLocaleDateString() : '永久有效'}</td>
+          <td class="py-3 px-4 text-right">
+            ${u.username !== 'admin' ? `
+              <button onclick="deleteUser('${u.username}')" class="text-rose-500 hover:text-rose-700 text-xs font-medium">删除</button>
+            ` : '<span class="text-slate-400">-</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
 
-        async function fetchAPI(url, options = {}) {
-            options.headers = options.headers || {};
-            options.headers['Authorization'] = 'Bearer ' + token;
-            const res = await fetch(url, options);
-            if (res.status === 401 || res.status === 403) {
-                doLogout();
-                return null;
-            }
-            return res.json();
-        }
+    async function submitAddUser(e) {
+      e.preventDefault();
+      const payload = {
+        username: document.getElementById('newUsername').value,
+        password: document.getElementById('newPassword').value,
+        monthly_quota: parseInt(document.getElementById('newQuota').value) || 500,
+      };
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        closeModal('addUserModal');
+        document.getElementById('addUserForm').reset();
+        loadUsers();
+      } else {
+        alert('创建失败：用户可能已存在');
+      }
+    }
 
-        async function loadStats() {
-            const data = await fetchAPI('/api/admin/stats');
-            if (data) {
-                document.getElementById('statToday').innerText = data.today_pulls;
-                document.getElementById('statMonth').innerText = data.monthly_pulls;
-                document.getElementById('statTotal').innerText = data.total_pulls;
-                document.getElementById('statUsers').innerText = data.total_users;
-            }
-        }
+    async function deleteUser(username) {
+      if (!confirm('确定删除用户 ' + username + '？')) return;
+      await fetch('/api/admin/users/' + username, { method: 'DELETE' });
+      loadUsers();
+    }
 
-        async function loadUsers() {
-            const data = await fetchAPI('/api/admin/users');
-            if (!data) return;
-            const tbody = document.getElementById('userTableBody');
-            tbody.innerHTML = '';
-            data.users.forEach(u => {
-                const tr = document.createElement('tr');
-                const quotaText = u.monthly_quota === 0 ? `${u.used_quota} / 无限` : `${u.used_quota} / ${u.monthly_quota}`;
-                const roleText = u.is_admin ? '<span class="badge badge-info">管理员</span>' : '普通用户';
-                const statusText = u.is_enabled ? '<span class="badge badge-success">正常</span>' : '<span class="badge badge-danger">已禁用</span>';
-                tr.innerHTML = `
-                    <td><strong>${u.username}</strong></td>
-                    <td>${quotaText}</td>
-                    <td>${roleText}</td>
-                    <td>${statusText}</td>
-                    <td>${u.remark || '-'}</td>
-                    <td>
-                        <button class="btn btn-sm" onclick='editUser(${JSON.stringify(u)})'>编辑</button>
-                        <button class="btn btn-sm btn-danger" onclick='deleteUser(${u.id})'>删除</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+    async function loadLogs() {
+      const res = await fetch('/api/admin/logs?limit=50');
+      const data = await res.json();
+      const tbody = document.getElementById('logsTableBody');
+      tbody.innerHTML = (data || []).map(l => `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="py-2.5 px-4 text-slate-400">${new Date(l.created_at).toLocaleString()}</td>
+          <td class="py-2.5 px-4 font-semibold text-slate-700 dark:text-slate-200">${l.username}</td>
+          <td class="py-2.5 px-4 text-slate-500">${l.client_ip}</td>
+          <td class="py-2.5 px-4 text-slate-500">${l.registry}</td>
+          <td class="py-2.5 px-4 text-blue-600 dark:text-blue-400 font-medium">${l.image}</td>
+          <td class="py-2.5 px-4 text-slate-500">${l.action}</td>
+          <td class="py-2.5 px-4"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${l.status < 300 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'}">${l.status}</span></td>
+          <td class="py-2.5 px-4 text-right text-slate-400">${l.duration_ms} ms</td>
+        </tr>
+      `).join('');
+    }
 
-        function openUserModal() {
-            document.getElementById('userModalTitle').innerText = '新建用户';
-            document.getElementById('modalUserId').value = '';
-            document.getElementById('modalUsername').value = '';
-            document.getElementById('modalUsername').disabled = false;
-            document.getElementById('modalPassword').value = '';
-            document.getElementById('modalMonthlyQuota').value = 100;
-            document.getElementById('modalIsEnabled').value = 'true';
-            document.getElementById('modalIsAdmin').value = 'false';
-            document.getElementById('modalRemark').value = '';
-            document.getElementById('userModal').classList.add('show');
-        }
+    async function loadOverview() {
+      const [uRes, lRes, cRes, sRes] = await Promise.all([
+        fetch('/api/admin/users').then(r => r.json()).catch(() => []),
+        fetch('/api/admin/logs?limit=1').then(r => r.json()).catch(() => []),
+        fetch('/api/admin/upstreams').then(r => r.json()).catch(() => []),
+        fetch('/api/admin/settings').then(r => r.json()).catch(() => ({}))
+      ]);
+      document.getElementById('statUsers').textContent = (uRes || []).length;
+      document.getElementById('statPulls').textContent = (lRes || []).length > 0 ? '活跃' : '0';
+      document.getElementById('statCreds').textContent = (cRes || []).length;
+      document.getElementById('statAnon').textContent = sRes.allow_anonymous === 'true' ? '已开放' : '已禁止';
+    }
 
-        function editUser(u) {
-            document.getElementById('userModalTitle').innerText = '编辑用户: ' + u.username;
-            document.getElementById('modalUserId').value = u.id;
-            document.getElementById('modalUsername').value = u.username;
-            document.getElementById('modalUsername').disabled = true;
-            document.getElementById('modalPassword').value = '';
-            document.getElementById('modalMonthlyQuota').value = u.monthly_quota;
-            document.getElementById('modalIsEnabled').value = u.is_enabled ? 'true' : 'false';
-            document.getElementById('modalIsAdmin').value = u.is_admin ? 'true' : 'false';
-            document.getElementById('modalRemark').value = u.remark || '';
-            document.getElementById('userModal').classList.add('show');
-        }
+    async function loadSettings() {
+      const res = await fetch('/api/admin/settings');
+      const data = await res.json();
+      document.getElementById('settingAllowAnonymous').checked = data.allow_anonymous === 'true';
+      document.getElementById('settingAnonQuota').value = data.anonymous_monthly_quota || '50';
+    }
 
-        async function submitUserForm() {
-            const id = document.getElementById('modalUserId').value;
-            const username = document.getElementById('modalUsername').value;
-            const password = document.getElementById('modalPassword').value;
-            const monthly_quota = parseInt(document.getElementById('modalMonthlyQuota').value) || 0;
-            const is_enabled = document.getElementById('modalIsEnabled').value === 'true';
-            const is_admin = document.getElementById('modalIsAdmin').value === 'true';
-            const remark = document.getElementById('modalRemark').value;
+    async function saveSettings() {
+      const payload = {
+        allow_anonymous: document.getElementById('settingAllowAnonymous').checked ? 'true' : 'false',
+        anonymous_monthly_quota: document.getElementById('settingAnonQuota').value,
+      };
+      await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      alert('策略保存成功');
+    }
 
-            if (!id && (!username || !password)) {
-                alert('用户名和密码必填');
-                return;
-            }
+    function logoutAdmin() {
+      // 触发无权限弹窗清空 basic auth
+      window.location.href = "logout://fake";
+      setTimeout(() => location.href = "/", 200);
+    }
 
-            if (id) {
-                await fetchAPI('/api/admin/users/' + id, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password, monthly_quota, is_enabled, is_admin, remark })
-                });
-            } else {
-                await fetchAPI('/api/admin/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, monthly_quota, is_admin, remark })
-                });
-            }
-            closeModal('userModal');
-            loadUsers();
-        }
-
-        async function deleteUser(id) {
-            if (!confirm('确定删除该用户？')) return;
-            await fetchAPI('/api/admin/users/' + id, { method: 'DELETE' });
-            loadUsers();
-        }
-
-        async function loadLogs() {
-            const kw = document.getElementById('logKeyword').value;
-            const data = await fetchAPI('/api/admin/logs?limit=50&keyword=' + encodeURIComponent(kw));
-            if (!data) return;
-            const tbody = document.getElementById('logTableBody');
-            tbody.innerHTML = '';
-            data.logs.forEach(l => {
-                const tr = document.createElement('tr');
-                const dateStr = new Date(l.created_at).toLocaleString();
-                const statusBadge = l.status < 400 ? `<span class="badge badge-success">${l.status}</span>` : `<span class="badge badge-danger">${l.status}</span>`;
-                tr.innerHTML = `
-                    <td style="font-size: 12px; color: var(--text-muted);">${dateStr}</td>
-                    <td><strong>${l.username}</strong></td>
-                    <td style="font-size: 12px;">${l.client_ip}</td>
-                    <td>${l.registry}</td>
-                    <td style="color: #60a5fa;">${l.image}</td>
-                    <td><span class="badge badge-info">${l.action}</span></td>
-                    <td>${statusBadge}</td>
-                    <td style="font-size: 12px;">${l.duration_ms} ms</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function loadUpstreams() {
-            const data = await fetchAPI('/api/admin/upstreams');
-            if (!data) return;
-            const tbody = document.getElementById('upstreamTableBody');
-            tbody.innerHTML = '';
-            data.credentials.forEach(c => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${c.registry}</strong></td>
-                    <td>${c.username}</td>
-                    <td><span class="badge badge-success">生效中</span></td>
-                    <td style="font-size: 12px; color: var(--text-muted);">${new Date(c.updated_at).toLocaleString()}</td>
-                    <td><button class="btn btn-sm btn-danger" onclick="deleteUpstream(${c.id})">删除</button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function openUpstreamModal() {
-            document.getElementById('upstreamModal').classList.add('show');
-        }
-
-        async function submitUpstreamForm() {
-            const registry = document.getElementById('upstreamRegistry').value;
-            const username = document.getElementById('upstreamUsername').value;
-            const password = document.getElementById('upstreamPassword').value;
-
-            if (!username || !password) {
-                alert('请填写官方用户名和密码/PAT');
-                return;
-            }
-
-            await fetchAPI('/api/admin/upstreams', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ registry, username, password, is_enabled: true })
-            });
-            closeModal('upstreamModal');
-            loadUpstreams();
-        }
-
-        async function deleteUpstream(id) {
-            if (!confirm('确定删除该上游凭据？')) return;
-            await fetchAPI('/api/admin/upstreams/' + id, { method: 'DELETE' });
-            loadUpstreams();
-        }
-
-        async function loadSettings() {
-            const data = await fetchAPI('/api/admin/settings');
-            if (!data) return;
-            const s = data.settings;
-            if (s.allow_anonymous) document.getElementById('cfg_allow_anonymous').value = s.allow_anonymous;
-            if (s.anonymous_monthly_quota) document.getElementById('cfg_anonymous_monthly_quota').value = s.anonymous_monthly_quota;
-            if (s.allow_passthrough) document.getElementById('cfg_allow_passthrough').value = s.allow_passthrough;
-        }
-
-        async function saveSettings() {
-            const payload = {
-                allow_anonymous: document.getElementById('cfg_allow_anonymous').value,
-                anonymous_monthly_quota: document.getElementById('cfg_anonymous_monthly_quota').value,
-                allow_passthrough: document.getElementById('cfg_allow_passthrough').value
-            };
-            await fetchAPI('/api/admin/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            alert('配置已保存生效！');
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.remove('show');
-        }
-
-        function updateClientGuide() {
-            const host = window.location.host;
-            document.getElementById('clientGuide').innerText = 
-`# 1. 登录自建代理站
-docker login ${host} -u <你的用户名> -p <你的密码>
-
-# 2. 拉取 Docker Hub 官方镜像
-docker pull ${host}/nginx:latest
-docker pull ${host}/redis:alpine
-
-# 3. 拉取其他镜像仓库 (如 ghcr.io / quay.io)
-docker pull ${host}/ghcr.io/owner/repo:tag`;
-        }
-
-        checkAuth();
-    </script>
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      switchTab('upstreams');
+    });
+  </script>
 </body>
 </html>
