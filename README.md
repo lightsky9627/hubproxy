@@ -4,6 +4,63 @@ HubProxy 是基于 Go 语言开发的容器镜像（Docker Registry v2）透明�
 
 ---
 
+## 📥 二进制下载
+
+编译产物会自动发布至 GitHub 仓库：
+- **GitHub Releases**：直接前往 [Releases 页面](https://github.com/lightsky9627/hubproxy/releases) 下载最新版本的 `hubproxy-linux-amd64.tar.gz` 或 `hubproxy-linux-arm64.tar.gz`。
+- **Actions Artifacts**：在每次 commit 的 [Actions 页面](https://github.com/lightsky9627/hubproxy/actions) 底部也可以直接下载打包的 Artifacts。
+
+---
+
+## 🛠️ 部署与服务管理
+
+下载二进制文件后，将其放置于 `/usr/local/bin/hubproxy`：
+```bash
+chmod +x hubproxy-linux-amd64
+sudo mv hubproxy-linux-amd64 /usr/local/bin/hubproxy
+
+# 创建工作目录与数据目录
+sudo mkdir -p /etc/hubproxy/data
+sudo cp src/config.toml /etc/hubproxy/config.toml
+```
+
+### 1. Systemd 服务管理（Debian / Ubuntu / CentOS / Rocky Linux）
+
+1. 复制 service 文件：
+   ```bash
+   sudo cp packaging/systemd/hubproxy.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   ```
+2. 管理命令：
+   ```bash
+   sudo systemctl enable --now hubproxy  # 开机自启并立即启动
+   sudo systemctl status hubproxy        # 查看运行状态
+   sudo systemctl restart hubproxy       # 重启服务
+   journalctl -u hubproxy -f             # 实时查看日志
+   ```
+
+### 2. Alpine Linux (OpenRC 管理)
+
+Alpine Linux 默认使用 OpenRC 进行服务管理：
+1. 复制 init.d 脚本并赋予执行权限：
+   ```bash
+   cp packaging/openrc/hubproxy.initd /etc/init.d/hubproxy
+   chmod +x /etc/init.d/hubproxy
+   ```
+2. 管理命令：
+   ```bash
+   rc-update add hubproxy default   # 添加开机自启
+   rc-service hubproxy start        # 启动服务
+   rc-service hubproxy status       # 查看状态
+   rc-service hubproxy restart      # 重启服务
+   ```
+3. 查看日志：
+   ```bash
+   tail -f /var/log/hubproxy.log
+   ```
+
+---
+
 ## ✨ 核心特性
 
 - 🐳 **专注容器镜像** - 全面适配 Docker Registry v2 协议，支持 Docker Hub、GHCR、Quay、GCR、K8s 等多种镜像仓库。
