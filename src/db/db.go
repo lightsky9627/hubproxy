@@ -66,13 +66,18 @@ func InitDB(dbPath string) error {
 			dbPath = "hubproxy.db"
 		}
 
-		dir := filepath.Dir(dbPath)
-		if dir != "." && dir != "" {
-			_ = os.MkdirAll(dir, 0755)
+		absPath, err := filepath.Abs(dbPath)
+		if err == nil {
+			dbPath = absPath
 		}
 
-		dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", dbPath)
-		var err error
+		dir := filepath.Dir(dbPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			initErr = fmt.Errorf("create db dir %s failed: %w", dir, err)
+			return
+		}
+
+		dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", dbPath)
 		DB, err = sql.Open("sqlite", dsn)
 		if err != nil {
 			initErr = fmt.Errorf("open sqlite db failed: %w", err)

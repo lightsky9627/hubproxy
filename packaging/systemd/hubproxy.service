@@ -7,13 +7,14 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/etc/hubproxy
+ExecStartPre=/bin/mkdir -p /etc/hubproxy/data
 ExecStart=/usr/local/bin/hubproxy
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
+ReadWritePaths=/etc/hubproxy
 
 # 安全限制
-ProtectSystem=full
 ProtectHome=true
 PrivateTmp=true
 
