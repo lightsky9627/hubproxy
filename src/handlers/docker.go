@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"hubproxy/config"
+	"hubproxy/db"
 	"hubproxy/utils"
 )
 
@@ -193,12 +194,51 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		return
 	}
 
+	start := time.Now()
+	username := "anonymous"
+
+	// 检查当前请求的认证信息，看是否是我们签发的 JWT
+	authHeader := c.GetHeader("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if claims, err := ParseLocalToken(tokenStr); err == nil && claims.Username != "" {
+			username = claims.Username
+			// 扣减用户月度配额（只在拉取 manifest 时扣减，避免 blob 下载每个分块重复计费）
+			if strings.Contains(path, "/manifests/") {
+				if ok, reason := db.CheckAndConsumeUserQuota(username); !ok {
+					c.String(http.StatusTooManyRequests, reason)
+					return
+				}
+			}
+		}
+	}
+
 	if !strings.HasPrefix(path, "/v2/") {
 		c.String(http.StatusNotFound, "Docker Registry API v2 only")
 		return
 	}
 
 	handleRegistryRequest(c, path)
+
+	// 记录拉取日志
+	if strings.Contains(path, "/manifests/") || strings.Contains(path, "/blobs/") {
+		pathWithoutV2 := strings.TrimPrefix(path, "/v2/")
+		target, targetPath := resolveRegistryTarget(c, pathWithoutV2)
+		imageName, apiType, _ := parseRegistryPath(targetPath)
+		if imageName != "" {
+			duration := time.Since(start).Milliseconds()
+			go db.RecordPullLog(db.PullLog{
+				Username:   username,
+				ClientIP:   c.ClientIP(),
+				Registry:   target.Name,
+				Image:      imageName,
+				Action:     apiType,
+				Status:     c.Writer.Status(),
+				DurationMs: duration,
+				UserAgent:  c.Request.UserAgent(),
+			})
+		}
+	}
 }
 
 func handleRegistryRequest(c *gin.Context, path string) {
@@ -244,57 +284,9 @@ func parseRegistryPath(path string) (imageName, apiType, reference string) {
 	return "", "", ""
 }
 
-// 代理 Docker token 请求，并透传客户端认证头。
+// 统一认证入口
 func ProxyDockerAuthGin(c *gin.Context) {
-	target, ok := resolveTokenTarget(c)
-	if !ok {
-		c.String(http.StatusBadRequest, "Unknown registry target")
-		return
-	}
-
-	cacheable := c.GetHeader("Authorization") == "" && utils.IsTokenCacheEnabled() && c.Request.Method == http.MethodGet
-	cacheKey := utils.BuildTokenCacheKey(target.Name + ":" + c.Request.URL.RawQuery)
-	if cacheable {
-		if cachedToken := utils.GlobalCache.GetToken(cacheKey); cachedToken != "" {
-			utils.WriteTokenResponse(c, cachedToken)
-			return
-		}
-	}
-
-	authURL, err := buildAuthURL(target, c.Request.URL.RawQuery)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to build auth request")
-		return
-	}
-
-	req, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, authURL, nil)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to create auth request")
-		return
-	}
-	forwardSelectedRequestHeaders(req.Header, c.Request.Header)
-
-	resp, err := utils.GetGlobalHTTPClient().Do(req)
-	if err != nil {
-		c.String(http.StatusBadGateway, "Auth request failed")
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.String(http.StatusBadGateway, "Failed to read auth response")
-		return
-	}
-
-	copyResponseHeaders(c, resp.Header, target)
-	if cacheable && resp.StatusCode == http.StatusOK && len(body) > 0 {
-		ttl := utils.ExtractTTLFromResponse(body)
-		utils.GlobalCache.SetToken(cacheKey, string(body), ttl)
-		anonymousTokens.RememberFromResponse(body, ttl)
-	}
-
-	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+	HandleDockerAuthToken(c)
 }
 
 func (s *anonymousTokenStore) RememberFromResponse(body []byte, ttl time.Duration) {
@@ -452,6 +444,41 @@ func proxyRegistryHTTP(c *gin.Context, target registryTarget, upstreamPath strin
 		return
 	}
 	forwardSelectedRequestHeaders(req.Header, c.Request.Header)
+
+	// 如果客户端携带的是本站自建 JWT Token，需要将其转换为官方或上游 Token 传给上游 registry
+	authHeader := c.GetHeader("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if claims, err := ParseLocalToken(tokenStr); err == nil {
+			// 本地有效用户！检查是否有该 Registry 的服务端账号
+			req.Header.Del("Authorization") // 先移除本地 JWT
+			scope := "repository:" + strings.TrimPrefix(upstreamPath, "/v2/")
+			if idx := strings.Index(scope, "/manifests/"); idx != -1 {
+				scope = scope[:idx] + ":pull"
+			} else if idx := strings.Index(scope, "/blobs/"); idx != -1 {
+				scope = scope[:idx] + ":pull"
+			}
+
+			if upstreamCred, err := db.GetActiveUpstreamCredential(target.Name); err == nil && upstreamCred != nil {
+				upstreamToken, err := fetchUpstreamTokenWithCred(target, scope, upstreamCred.Username, upstreamCred.Password)
+				if err == nil && upstreamToken != "" {
+					var tokStruct struct {
+						Token       string `json:"token"`
+						AccessToken string `json:"access_token"`
+					}
+					_ = json.Unmarshal([]byte(upstreamToken), &tokStruct)
+					finalTok := tokStruct.Token
+					if finalTok == "" {
+						finalTok = tokStruct.AccessToken
+					}
+					if finalTok != "" {
+						req.Header.Set("Authorization", "Bearer "+finalTok)
+					}
+				}
+			}
+			_ = claims // used
+		}
+	}
 
 	resp, err := utils.GetGlobalHTTPClient().Do(req)
 	if err != nil {

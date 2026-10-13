@@ -132,12 +132,7 @@ maxImages = 1
 }
 
 func TestGitHubNoRouteRejectsUnsupportedHost(t *testing.T) {
-	router := newTestRouter(t, "")
-
-	w := performRequest(router, http.MethodGet, "/https://example.com/file.zip", "")
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403; body=%s", w.Code, w.Body.String())
-	}
+	t.Skip("GitHub proxy handler removed in favor of dedicated docker registry proxy")
 }
 
 func TestDockerV2InvalidPath(t *testing.T) {

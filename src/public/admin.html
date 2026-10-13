@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HubProxy - 管理控制台</title>
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card-border: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --success: #10b981;
+            --radius: 8px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--card-border);
+            margin-bottom: 24px;
+        }
+        .logo-area { display: flex; align-items: center; gap: 10px; }
+        .logo-area h1 { font-size: 20px; font-weight: 700; }
+        .nav-tabs { display: flex; gap: 8px; }
+        .nav-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid transparent;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover { color: var(--text); background: var(--card); }
+        .nav-btn.active { background: var(--primary); color: #fff; }
+        
+        .card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .stat-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+        .stat-card .title { font-size: 13px; color: var(--text-muted); }
+        .stat-card .value { font-size: 24px; font-weight: 700; margin-top: 6px; color: var(--primary); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--card-border); }
+        th { color: var(--text-muted); font-weight: 600; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            background: #090d16;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .modal.show { display: flex; }
+        .modal-body {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 480px;
+            padding: 24px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(16,185,129,0.2); color: #34d399; }
+        .badge-danger { background: rgba(239,68,68,0.2); color: #f87171; }
+        .badge-info { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- 登录面板 -->
+        <div id="loginView" style="max-width: 400px; margin: 100px auto;" class="card">
+            <h2 style="margin-bottom: 16px; text-align: center;">管理员登录</h2>
+            <div class="form-group">
+                <label>管理员账号</label>
+                <input type="text" id="loginUser" class="form-control" value="admin">
+            </div>
+            <div class="form-group">
+                <label>管理员密码</label>
+                <input type="password" id="loginPass" class="form-control" placeholder="默认密码: admin123456">
+            </div>
+            <button class="btn" style="width: 100%; padding: 10px;" onclick="doLogin()">立即登录</button>
+            <div id="loginError" style="color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center;"></div>
+        </div>
+
+        <!-- 主面板 -->
+        <div id="mainView" style="display: none;">
+            <header>
+                <div class="logo-area">
+                    <h1>🐳 HubProxy 控制台</h1>
+                    <span id="currentAdmin" class="badge badge-info">admin</span>
+                </div>
+                <div class="nav-tabs">
+                    <button class="nav-btn active" onclick="switchTab('dashboard')">概览看板</button>
+                    <button class="nav-btn" onclick="switchTab('users')">用户与配额</button>
+                    <button class="nav-btn" onclick="switchTab('upstreams')">DockerHub上游</button>
+                    <button class="nav-btn" onclick="switchTab('logs')">拉取日志</button>
+                    <button class="nav-btn" onclick="switchTab('settings')">防滥用设置</button>
+                    <button class="nav-btn btn-danger" onclick="doLogout()">退出</button>
+                </div>
+            </header>
+
+            <!-- 概览看板 -->
+            <div id="tab-dashboard" class="tab-pane">
+                <div class="grid-4">
+                    <div class="stat-card">
+                        <div class="title">今日镜像拉取</div>
+                        <div class="value" id="statToday">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="title">本月累计拉取</div>
+                        <div class="value" id="statMonth">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="title">总拉取记录</div>
+                        <div class="value" id="statTotal">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="title">注册用户数</div>
+                        <div class="value" id="statUsers">0</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <h3>客户端连接指引</h3>
+                    <p style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">
+                        创建用户后，用户可在本地终端通过该账号登录你的代理站，直接拉取镜像：
+                    </p>
+                    <pre style="background: #090d16; padding: 12px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 13px; color: #a5b4fc;" id="clientGuide">
+docker login &lt;your-domain&gt; -u &lt;username&gt; -p &lt;password&gt;
+docker pull &lt;your-domain&gt;/library/nginx:latest
+docker pull &lt;your-domain&gt;/redis:alpine
+                    </pre>
+                </div>
+            </div>
+
+            <!-- 用户管理 -->
+            <div id="tab-users" class="tab-pane" style="display: none;">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>用户账号管理</h3>
+                        <button class="btn" onclick="openUserModal()">+ 新建用户</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>用户名</th>
+                                <th>当月已用 / 配额上限</th>
+                                <th>角色</th>
+                                <th>状态</th>
+                                <th>备注</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 上游凭证管理 -->
+            <div id="tab-upstreams" class="tab-pane" style="display: none;">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3>Docker Hub 官方账号池</h3>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                                配置你自己的 Docker Hub 账号/PAT。当用户匿名或以代理账号拉取时，HubProxy 会使用此凭据向上游拉取，享受无限制或付费高额度。
+                            </p>
+                        </div>
+                        <button class="btn" onclick="openUpstreamModal()">+ 添加上游凭据</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Registry</th>
+                                <th>账号 / 用户名</th>
+                                <th>状态</th>
+                                <th>更新时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="upstreamTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 拉取日志 -->
+            <div id="tab-logs" class="tab-pane" style="display: none;">
+                <div class="card">
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                        <input type="text" id="logKeyword" class="form-control" style="max-width: 260px;" placeholder="搜索镜像或IP..." onkeyup="if(event.key==='Enter')loadLogs()">
+                        <button class="btn" onclick="loadLogs()">搜索</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>账号</th>
+                                <th>客户端 IP</th>
+                                <th>目标 Registry</th>
+                                <th>镜像名称</th>
+                                <th>动作</th>
+                                <th>状态码</th>
+                                <th>耗时</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 系统设置 -->
+            <div id="tab-settings" class="tab-pane" style="display: none;">
+                <div class="card" style="max-width: 600px;">
+                    <h3 style="margin-bottom: 16px;">防滥用安全策略</h3>
+                    <div class="form-group">
+                        <label>允许匿名未登录拉取</label>
+                        <select id="cfg_allow_anonymous" class="form-control">
+                            <option value="true">允许 (适合公共镜像站，配合月度限额)</option>
+                            <option value="false">禁止 (必须通过 docker login 本地账号才允许拉取)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>匿名用户每月拉取上限 (按 IP 计数)</label>
+                        <input type="number" id="cfg_anonymous_monthly_quota" class="form-control" placeholder="0 为不限制，默认 50">
+                    </div>
+                    <div class="form-group">
+                        <label>允许未知用户透传 Docker Hub</label>
+                        <select id="cfg_allow_passthrough" class="form-control">
+                            <option value="true">允许 (未在本地注册的 docker hub 账号透传验证)</option>
+                            <option value="false">禁止 (仅允许本地数据库注册账号)</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="saveSettings()">保存配置</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户编辑弹窗 -->
+        <div class="modal" id="userModal">
+            <div class="modal-body">
+                <h3 id="userModalTitle" style="margin-bottom: 16px;">新建用户</h3>
+                <input type="hidden" id="modalUserId">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="modalUsername" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>密码 (留空则不修改)</label>
+                    <input type="password" id="modalPassword" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>每月拉取次数限额 (0 表示不限)</label>
+                    <input type="number" id="modalMonthlyQuota" class="form-control" value="100">
+                </div>
+                <div class="form-group">
+                    <label>是否启用</label>
+                    <select id="modalIsEnabled" class="form-control">
+                        <option value="true">启用</option>
+                        <option value="false">禁用</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>是否为管理员</label>
+                    <select id="modalIsAdmin" class="form-control">
+                        <option value="false">普通用户</option>
+                        <option value="true">管理员</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <input type="text" id="modalRemark" class="form-control">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button class="btn" style="background: #475569;" onclick="closeModal('userModal')">取消</button>
+                    <button class="btn" onclick="submitUserForm()">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 上游凭证弹窗 -->
+        <div class="modal" id="upstreamModal">
+            <div class="modal-body">
+                <h3 style="margin-bottom: 16px;">配置上游凭据</h3>
+                <div class="form-group">
+                    <label>目标 Registry</label>
+                    <input type="text" id="upstreamRegistry" class="form-control" value="docker.io">
+                </div>
+                <div class="form-group">
+                    <label>官方用户名</label>
+                    <input type="text" id="upstreamUsername" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>密码 / PAT Token</label>
+                    <input type="password" id="upstreamPassword" class="form-control">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button class="btn" style="background: #475569;" onclick="closeModal('upstreamModal')">取消</button>
+                    <button class="btn" onclick="submitUpstreamForm()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('hubproxy_admin_token') || '';
+
+        function checkAuth() {
+            if (token) {
+                document.getElementById('loginView').style.display = 'none';
+                document.getElementById('mainView').style.display = 'block';
+                loadStats();
+                updateClientGuide();
+            } else {
+                document.getElementById('loginView').style.display = 'block';
+                document.getElementById('mainView').style.display = 'none';
+            }
+        }
+
+        async function doLogin() {
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPass').value;
+            const errDiv = document.getElementById('loginError');
+            errDiv.innerText = '';
+
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.token;
+                    localStorage.setItem('hubproxy_admin_token', token);
+                    document.getElementById('currentAdmin').innerText = data.username;
+                    checkAuth();
+                } else {
+                    errDiv.innerText = data.error || '登录失败';
+                }
+            } catch (e) {
+                errDiv.innerText = '网络异常: ' + e.message;
+            }
+        }
+
+        function doLogout() {
+            token = '';
+            localStorage.removeItem('hubproxy_admin_token');
+            checkAuth();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).style.display = 'block';
+            event.target.classList.add('active');
+
+            if (tabId === 'dashboard') loadStats();
+            if (tabId === 'users') loadUsers();
+            if (tabId === 'upstreams') loadUpstreams();
+            if (tabId === 'logs') loadLogs();
+            if (tabId === 'settings') loadSettings();
+        }
+
+        async function fetchAPI(url, options = {}) {
+            options.headers = options.headers || {};
+            options.headers['Authorization'] = 'Bearer ' + token;
+            const res = await fetch(url, options);
+            if (res.status === 401 || res.status === 403) {
+                doLogout();
+                return null;
+            }
+            return res.json();
+        }
+
+        async function loadStats() {
+            const data = await fetchAPI('/api/admin/stats');
+            if (data) {
+                document.getElementById('statToday').innerText = data.today_pulls;
+                document.getElementById('statMonth').innerText = data.monthly_pulls;
+                document.getElementById('statTotal').innerText = data.total_pulls;
+                document.getElementById('statUsers').innerText = data.total_users;
+            }
+        }
+
+        async function loadUsers() {
+            const data = await fetchAPI('/api/admin/users');
+            if (!data) return;
+            const tbody = document.getElementById('userTableBody');
+            tbody.innerHTML = '';
+            data.users.forEach(u => {
+                const tr = document.createElement('tr');
+                const quotaText = u.monthly_quota === 0 ? `${u.used_quota} / 无限` : `${u.used_quota} / ${u.monthly_quota}`;
+                const roleText = u.is_admin ? '<span class="badge badge-info">管理员</span>' : '普通用户';
+                const statusText = u.is_enabled ? '<span class="badge badge-success">正常</span>' : '<span class="badge badge-danger">已禁用</span>';
+                tr.innerHTML = `
+                    <td><strong>${u.username}</strong></td>
+                    <td>${quotaText}</td>
+                    <td>${roleText}</td>
+                    <td>${statusText}</td>
+                    <td>${u.remark || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm" onclick='editUser(${JSON.stringify(u)})'>编辑</button>
+                        <button class="btn btn-sm btn-danger" onclick='deleteUser(${u.id})'>删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openUserModal() {
+            document.getElementById('userModalTitle').innerText = '新建用户';
+            document.getElementById('modalUserId').value = '';
+            document.getElementById('modalUsername').value = '';
+            document.getElementById('modalUsername').disabled = false;
+            document.getElementById('modalPassword').value = '';
+            document.getElementById('modalMonthlyQuota').value = 100;
+            document.getElementById('modalIsEnabled').value = 'true';
+            document.getElementById('modalIsAdmin').value = 'false';
+            document.getElementById('modalRemark').value = '';
+            document.getElementById('userModal').classList.add('show');
+        }
+
+        function editUser(u) {
+            document.getElementById('userModalTitle').innerText = '编辑用户: ' + u.username;
+            document.getElementById('modalUserId').value = u.id;
+            document.getElementById('modalUsername').value = u.username;
+            document.getElementById('modalUsername').disabled = true;
+            document.getElementById('modalPassword').value = '';
+            document.getElementById('modalMonthlyQuota').value = u.monthly_quota;
+            document.getElementById('modalIsEnabled').value = u.is_enabled ? 'true' : 'false';
+            document.getElementById('modalIsAdmin').value = u.is_admin ? 'true' : 'false';
+            document.getElementById('modalRemark').value = u.remark || '';
+            document.getElementById('userModal').classList.add('show');
+        }
+
+        async function submitUserForm() {
+            const id = document.getElementById('modalUserId').value;
+            const username = document.getElementById('modalUsername').value;
+            const password = document.getElementById('modalPassword').value;
+            const monthly_quota = parseInt(document.getElementById('modalMonthlyQuota').value) || 0;
+            const is_enabled = document.getElementById('modalIsEnabled').value === 'true';
+            const is_admin = document.getElementById('modalIsAdmin').value === 'true';
+            const remark = document.getElementById('modalRemark').value;
+
+            if (!id && (!username || !password)) {
+                alert('用户名和密码必填');
+                return;
+            }
+
+            if (id) {
+                await fetchAPI('/api/admin/users/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, monthly_quota, is_enabled, is_admin, remark })
+                });
+            } else {
+                await fetchAPI('/api/admin/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, monthly_quota, is_admin, remark })
+                });
+            }
+            closeModal('userModal');
+            loadUsers();
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('确定删除该用户？')) return;
+            await fetchAPI('/api/admin/users/' + id, { method: 'DELETE' });
+            loadUsers();
+        }
+
+        async function loadLogs() {
+            const kw = document.getElementById('logKeyword').value;
+            const data = await fetchAPI('/api/admin/logs?limit=50&keyword=' + encodeURIComponent(kw));
+            if (!data) return;
+            const tbody = document.getElementById('logTableBody');
+            tbody.innerHTML = '';
+            data.logs.forEach(l => {
+                const tr = document.createElement('tr');
+                const dateStr = new Date(l.created_at).toLocaleString();
+                const statusBadge = l.status < 400 ? `<span class="badge badge-success">${l.status}</span>` : `<span class="badge badge-danger">${l.status}</span>`;
+                tr.innerHTML = `
+                    <td style="font-size: 12px; color: var(--text-muted);">${dateStr}</td>
+                    <td><strong>${l.username}</strong></td>
+                    <td style="font-size: 12px;">${l.client_ip}</td>
+                    <td>${l.registry}</td>
+                    <td style="color: #60a5fa;">${l.image}</td>
+                    <td><span class="badge badge-info">${l.action}</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px;">${l.duration_ms} ms</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadUpstreams() {
+            const data = await fetchAPI('/api/admin/upstreams');
+            if (!data) return;
+            const tbody = document.getElementById('upstreamTableBody');
+            tbody.innerHTML = '';
+            data.credentials.forEach(c => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${c.registry}</strong></td>
+                    <td>${c.username}</td>
+                    <td><span class="badge badge-success">生效中</span></td>
+                    <td style="font-size: 12px; color: var(--text-muted);">${new Date(c.updated_at).toLocaleString()}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="deleteUpstream(${c.id})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openUpstreamModal() {
+            document.getElementById('upstreamModal').classList.add('show');
+        }
+
+        async function submitUpstreamForm() {
+            const registry = document.getElementById('upstreamRegistry').value;
+            const username = document.getElementById('upstreamUsername').value;
+            const password = document.getElementById('upstreamPassword').value;
+
+            if (!username || !password) {
+                alert('请填写官方用户名和密码/PAT');
+                return;
+            }
+
+            await fetchAPI('/api/admin/upstreams', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ registry, username, password, is_enabled: true })
+            });
+            closeModal('upstreamModal');
+            loadUpstreams();
+        }
+
+        async function deleteUpstream(id) {
+            if (!confirm('确定删除该上游凭据？')) return;
+            await fetchAPI('/api/admin/upstreams/' + id, { method: 'DELETE' });
+            loadUpstreams();
+        }
+
+        async function loadSettings() {
+            const data = await fetchAPI('/api/admin/settings');
+            if (!data) return;
+            const s = data.settings;
+            if (s.allow_anonymous) document.getElementById('cfg_allow_anonymous').value = s.allow_anonymous;
+            if (s.anonymous_monthly_quota) document.getElementById('cfg_anonymous_monthly_quota').value = s.anonymous_monthly_quota;
+            if (s.allow_passthrough) document.getElementById('cfg_allow_passthrough').value = s.allow_passthrough;
+        }
+
+        async function saveSettings() {
+            const payload = {
+                allow_anonymous: document.getElementById('cfg_allow_anonymous').value,
+                anonymous_monthly_quota: document.getElementById('cfg_anonymous_monthly_quota').value,
+                allow_passthrough: document.getElementById('cfg_allow_passthrough').value
+            };
+            await fetchAPI('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            alert('配置已保存生效！');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        function updateClientGuide() {
+            const host = window.location.host;
+            document.getElementById('clientGuide').innerText = 
+`# 1. 登录自建代理站
+docker login ${host} -u <你的用户名> -p <你的密码>
+
+# 2. 拉取 Docker Hub 官方镜像
+docker pull ${host}/nginx:latest
+docker pull ${host}/redis:alpine
+
+# 3. 拉取其他镜像仓库 (如 ghcr.io / quay.io)
+docker pull ${host}/ghcr.io/owner/repo:tag`;
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

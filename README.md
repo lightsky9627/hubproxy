@@ -1,27 +1,100 @@
-# HubProxy
+# HubProxy - 专为容器镜像打造的高性能防滥用代理加速器
 
- **Docker 和 GitHub 加速代理服务器**
+HubProxy 是基于 Go 语言开发的容器镜像（Docker Registry v2）透明代理与加速网关。内置 Web 镜像搜索、离线打包下载、多用户配额体系、官方 Docker Hub 账号池透传/托管、拉取日志审计以及管理员后台管理。
 
-一个轻量级、高性能的多功能代理服务，提供 Docker 镜像加速、GitHub 文件加速、下载离线镜像、在线搜索 Docker 镜像等功能。
+---
 
+## ✨ 核心特性
 
-<p align="center">
-  <img src="https://count.getloli.com/get/@sky22333.hubproxy?theme=rule34" alt="Visitors">
-</p>
+- 🐳 **专注容器镜像** - 全面适配 Docker Registry v2 协议，支持 Docker Hub、GHCR、Quay、GCR、K8s 等多种镜像仓库。
+- 🛡️ **严格防滥用机制** -
+  - **独立用户与配额**：支持在后台管理为不同团队/人员分配账号，支持自然月拉取次数限额控制。
+  - **匿名拉取限流**：支持设置是否允许未登录匿名拉取，以及按 IP 限制匿名每月拉取额度。
+  - **Docker Hub 上游账号池托管**：可在后台配置官方付费/高配额账号，客户端拉取时服务端使用托管账号向上游拿镜像，彻底隐藏上游凭据。
+  - **官方账号透传**：支持未在本地注册的 Docker Hub 账号凭据直接透传认证。
+- 📊 **可视化后台与审计** - 内置 `/admin` 管理后台，实时统计拉取数据，完整记录拉取时间、账号、客户端 IP、镜像名与耗时。
+- 🔍 **Web 镜像搜索与打包** - 纯浏览器在线搜索 Docker Hub 镜像与 Tag，支持单镜像/多镜像一键离线 tar 包流式打包下载。
+- ⚡ **单裸二进制部署** - 基于嵌入式 SQLite，无须搭建外部数据库，单二进制即拷即用，兼容 Alpine、Debian、CentOS、Rocky 等。
 
-## 特性
+---
 
-- 🐳 **Docker 镜像加速** - 支持 Docker Hub、GHCR、Quay 等多个镜像仓库加速，流式传输优化拉取速度。
-- 🐳 **离线镜像包** - 支持下载离线镜像包，流式传输加防抖设计。
-- 📁 **GitHub 文件加速** - 加速 GitHub Release、Raw 文件下载，支持`api.github.com`，脚本嵌套加速等等
-- 🤖 **AI 模型库支持** - 支持 Hugging Face 模型下载加速
-- 🛡️ **智能限流** - IP 限流保护，防止滥用
-- 🚫 **仓库审计** - 强大的自定义黑名单，白名单，同时审计镜像仓库，和GitHub仓库
-- 🔍 **镜像搜索** - 在线搜索 Docker 镜像
-- ⚡ **轻量高效** - 基于 Go 语言，单二进制文件运行，资源占用低。
-- 🔧 **统一配置** - 统一配置管理，便于维护。
-- 🛡️ **完全自托管** - 避免依赖免费第三方服务的不稳定性，例如`cloudflare`等等。
-- 🚀 **多服务统一加速** - 单个程序即可统一加速 Docker、GitHub、Hugging Face 等多种服务，简化部署与管理。
+## 🛠️ 快速启动
+
+### 裸二进制运行（推荐）
+
+1. 启动服务：
+   ```bash
+   ./hubproxy
+   ```
+2. 浏览器访问：
+   - 镜像搜索：`http://<IP>:5000`
+   - 管理后台：`http://<IP>:5000/admin`（默认账号：`admin`，默认密码：`admin123456`）
+
+### Docker Compose 启动
+
+```bash
+docker compose up -d
+```
+
+---
+
+## 💻 客户端 Docker 使用指引
+
+### 1. 登录自建代理站
+在后台管理为用户创建账号（例如 `user1` / `pass123`）后，在客户端终端登录：
+```bash
+docker login <your-domain> -u user1 -p pass123
+```
+
+### 2. 拉取 Docker Hub 官方镜像
+```bash
+docker pull <your-domain>/nginx:latest
+docker pull <your-domain>/library/redis:alpine
+```
+
+### 3. 拉取其他镜像仓库 (如 ghcr.io / quay.io)
+```bash
+docker pull <your-domain>/ghcr.io/owner/repo:latest
+docker pull <your-domain>/quay.io/coreos/etcd:latest
+```
+
+---
+
+## ⚙️ Nginx 反向代理配置参考
+
+```nginx
+server {
+    listen 80;
+    listen 443 ssl http2;
+    server_name hub.yourdomain.com;
+
+    # SSL 证书配置
+    # ssl_certificate /path/to/fullchain.pem;
+    # ssl_certificate_key /path/to/privkey.pem;
+
+    client_max_body_size 0;
+    chunked_transfer_encoding on;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 900s;
+        proxy_send_timeout 900s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+```
+
+---
+
+## 📦 CI/CD 持续集成
+
+- **GitLab CI**：配置了 `.gitlab-ci.yml`，自动构建 Linux AMD64 和 ARM64 静态二进制包。
+- **GitHub Actions**：配置了 `.github/workflows/build.yml`。
 
 ## 详细文档
 

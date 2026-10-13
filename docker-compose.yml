@@ -1,12 +1,16 @@
 services:
   hubproxy:
-    image: ghcr.io/sky22333/hubproxy
+    image: hubproxy:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: hubproxy
     restart: always
     ports:
       - "5000:5000"
     volumes:
       - ./src/config.toml:/app/config.toml:ro
+      - ./data:/app/data
     logging:
       driver: json-file
       options:

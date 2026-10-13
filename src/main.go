@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"hubproxy/config"
+	"hubproxy/db"
 	"hubproxy/handlers"
 	"hubproxy/utils"
 )
@@ -59,7 +60,7 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 
 	if cfg.Server.EnableFrontend {
 		router.GET("/", func(c *gin.Context) {
-			serveEmbedFile(c, "public/index.html")
+			serveEmbedFile(c, "public/search.html")
 		})
 		router.GET("/public/*filepath", func(c *gin.Context) {
 			filepath := strings.TrimPrefix(c.Param("filepath"), "/")
@@ -71,6 +72,9 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 		router.GET("/search.html", func(c *gin.Context) {
 			serveEmbedFile(c, "public/search.html")
 		})
+		router.GET("/admin", func(c *gin.Context) {
+			serveEmbedFile(c, "public/admin.html")
+		})
 		router.GET("/favicon.ico", func(c *gin.Context) {
 			serveEmbedFile(c, "public/favicon.ico")
 		})
@@ -79,15 +83,22 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 		router.GET("/public/*filepath", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 		router.GET("/images.html", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 		router.GET("/search.html", func(c *gin.Context) { c.Status(http.StatusNotFound) })
+		router.GET("/admin", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 		router.GET("/favicon.ico", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 	}
 
 	handlers.RegisterSearchRoute(router)
+	handlers.RegisterAdminRoutes(router)
 
 	router.Any("/token", handlers.ProxyDockerAuthGin)
 	router.Any("/token/*path", handlers.ProxyDockerAuthGin)
 	router.Any("/v2/*path", handlers.ProxyDockerRegistryGin)
-	router.NoRoute(handlers.GitHubProxyHandler)
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Not Found",
+			"code":  "NOT_FOUND",
+		})
+	})
 
 	return router
 }
@@ -95,6 +106,12 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 func main() {
 	if err := config.LoadConfig(); err != nil {
 		fmt.Printf("配置加载失败: %v\n", err)
+		return
+	}
+
+	// 初始化 SQLite 数据库
+	if err := db.InitDB("data/hubproxy.db"); err != nil {
+		fmt.Printf("初始化数据库失败: %v\n", err)
 		return
 	}
 

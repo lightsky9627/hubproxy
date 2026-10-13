@@ -1,0 +1,48 @@
+name: Build and Release Binaries
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Test
+        run: |
+          cd src
+          go test -v ./...
+
+      - name: Build Binaries (AMD64 & ARM64)
+        run: |
+          cd src
+          mkdir -p ../dist
+          VERSION=${{ github.ref_name }}
+          # 纯静态编译，无 CGO 依赖，完美兼容 Alpine 及任何 Linux 发行版
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X 'main.Version=${VERSION}'" -o ../dist/hubproxy-linux-amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X 'main.Version=${VERSION}'" -o ../dist/hubproxy-linux-arm64 .
+          cd ../dist
+          tar -czvf hubproxy-linux-amd64.tar.gz hubproxy-linux-amd64
+          tar -czvf hubproxy-linux-arm64.tar.gz hubproxy-linux-arm64
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hubproxy-binaries
+          path: |
+            dist/hubproxy-linux-amd64*
+            dist/hubproxy-linux-arm64*

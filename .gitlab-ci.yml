@@ -1,0 +1,42 @@
+stages:
+  - test
+  - build
+
+variables:
+  GOPROXY: "https://goproxy.cn,direct"
+
+cache:
+  paths:
+    - .go/pkg/mod/
+
+unit_tests:
+  stage: test
+  image: golang:1.24-alpine
+  before_script:
+    - apk add --no-cache git build-base
+  script:
+    - cd src
+    - go test -v ./...
+
+build_binaries:
+  stage: build
+  image: golang:1.24-alpine
+  before_script:
+    - apk add --no-cache git build-base tar
+  script:
+    - cd src
+    - mkdir -p ../dist
+    # 编译 Linux AMD64 (纯静态，无 CGO 依赖，支持 Alpine、Debian、CentOS、Rocky 等)
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X 'main.Version=${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}'" -o ../dist/hubproxy-linux-amd64 .
+    # 编译 Linux ARM64 (纯静态，兼容 aarch64、树莓派等)
+    - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X 'main.Version=${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}'" -o ../dist/hubproxy-linux-arm64 .
+    # 打包产物
+    - cd ../dist
+    - tar -czvf hubproxy-linux-amd64.tar.gz hubproxy-linux-amd64
+    - tar -czvf hubproxy-linux-arm64.tar.gz hubproxy-linux-arm64
+  artifacts:
+    name: "hubproxy-binaries-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - dist/hubproxy-linux-amd64*
+      - dist/hubproxy-linux-arm64*
+    expire_in: 30 days
