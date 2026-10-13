@@ -188,6 +188,20 @@ func isDockerHubAlias(name string) bool {
 func ProxyDockerRegistryGin(c *gin.Context) {
 	path := c.Request.URL.Path
 
+	// 检查当前请求的认证信息，看是否是我们签发的 JWT
+	authHeader := c.GetHeader("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if claims, err := ParseLocalToken(tokenStr); err == nil && claims.Username != "" {
+			if path == "/v2/" {
+				// docker login 握手成功：客户端携带有效 Token 探测 /v2/，直接响应 200 OK
+				c.Header("Docker-Distribution-API-Version", "registry/2.0")
+				c.JSON(http.StatusOK, gin.H{})
+				return
+			}
+		}
+	}
+
 	if path == "/v2/" {
 		target, _ := resolveRegistryTarget(c, "")
 		proxyRegistryHTTP(c, target, "/v2/")
@@ -197,8 +211,6 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 	start := time.Now()
 	username := "anonymous"
 
-	// 检查当前请求的认证信息，看是否是我们签发的 JWT
-	authHeader := c.GetHeader("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		if claims, err := ParseLocalToken(tokenStr); err == nil && claims.Username != "" {
