@@ -252,23 +252,26 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 
 	handleRegistryRequest(c, path)
 
-	// 记录拉取日志
-	if strings.Contains(path, "/manifests/") || strings.Contains(path, "/blobs/") {
-		pathWithoutV2 := strings.TrimPrefix(path, "/v2/")
-		target, targetPath := resolveRegistryTarget(c, pathWithoutV2)
-		imageName, apiType, _ := parseRegistryPath(targetPath)
-		if imageName != "" {
-			duration := time.Since(start).Milliseconds()
-			go db.RecordPullLog(db.PullLog{
-				Username:   username,
-				ClientIP:   c.ClientIP(),
-				Registry:   target.Name,
-				Image:      imageName,
-				Action:     apiType,
-				Status:     c.Writer.Status(),
-				DurationMs: duration,
-				UserAgent:  c.Request.UserAgent(),
-			})
+	// 记录拉取日志 (只记录最终 200 状态，或者带 Authorization 时的真实结果，过滤握手探测 401)
+	if strings.Contains(path, "/manifests/") {
+		status := c.Writer.Status()
+		if status == http.StatusOK || (authHeader != "" && status >= 400) {
+			pathWithoutV2 := strings.TrimPrefix(path, "/v2/")
+			target, targetPath := resolveRegistryTarget(c, pathWithoutV2)
+			imageName, apiType, _ := parseRegistryPath(targetPath)
+			if imageName != "" {
+				duration := time.Since(start).Milliseconds()
+				go db.RecordPullLog(db.PullLog{
+					Username:   username,
+					ClientIP:   c.ClientIP(),
+					Registry:   target.Name,
+					Image:      imageName,
+					Action:     apiType,
+					Status:     status,
+					DurationMs: duration,
+					UserAgent:  c.Request.UserAgent(),
+				})
+			}
 		}
 	}
 }
@@ -535,6 +538,36 @@ func proxyRegistryHTTP(c *gin.Context, target registryTarget, upstreamPath strin
 		return
 	}
 	defer resp.Body.Close()
+
+	// 对于 301, 302, 307 重定向（Docker Registry 的 Blob 下载通常重定向到 Cloudflare R2 / AWS S3 / 官方 CDN）
+	// 我们透明地在代理层代为拉取并流式回传给客户端，或者重写 Location，避免国内客户端直连 Cloudflare/AWS S3 被墙超时！
+	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusTemporaryRedirect || resp.StatusCode == http.StatusMovedPermanently {
+		loc := resp.Header.Get("Location")
+		if loc != "" && (strings.Contains(upstreamPath, "/blobs/") || strings.Contains(upstreamPath, "/manifests/")) {
+			// 服务端代理下载重定向的实际 Blob 数据流
+			redirectReq, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, loc, nil)
+			if err == nil {
+				forwardSelectedRequestHeaders(redirectReq.Header, c.Request.Header)
+				redirectReq.Header.Del("Authorization") // S3/Cloudflare 签名 URL 不需要且不能带原有 Registry Bearer Token
+				redirectResp, err := utils.GetGlobalHTTPClient().Do(redirectReq)
+				if err == nil {
+					defer redirectResp.Body.Close()
+					for k, vv := range redirectResp.Header {
+						if !shouldSkipResponseHeader(k) {
+							for _, v := range vv {
+								c.Header(k, v)
+							}
+						}
+					}
+					c.Status(redirectResp.StatusCode)
+					if c.Request.Method != http.MethodHead {
+						_, _ = io.Copy(c.Writer, redirectResp.Body)
+					}
+					return
+				}
+			}
+		}
+	}
 
 	copyResponseHeaders(c, resp.Header, target)
 	c.Status(resp.StatusCode)
