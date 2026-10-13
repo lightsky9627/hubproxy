@@ -211,17 +211,35 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 	start := time.Now()
 	username := "anonymous"
 
+	// 检查泛域名绑定的空间 (例如: qiankong.hub.bravexist.cn)
+	host := c.Request.Host
+	if colonIdx := strings.Index(host, ":"); colonIdx != -1 {
+		host = host[:colonIdx]
+	}
+	parts := strings.Split(host, ".")
+	if len(parts) >= 3 {
+		// 形如 <subdomain>.hub.bravexist.cn，提取前缀子域名
+		subdomain := parts[0]
+		if subdomain != "www" && subdomain != "hub" && subdomain != "api" {
+			// 检查是否存在对应的用户空间
+			if user, err := db.GetUserByUsername(subdomain); err == nil && user != nil && user.IsEnabled {
+				username = user.Username
+			}
+		}
+	}
+
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		if claims, err := ParseLocalToken(tokenStr); err == nil && claims.Username != "" {
 			username = claims.Username
-			// 扣减用户月度配额（只在拉取 manifest 时扣减，避免 blob 下载每个分块重复计费）
-			if strings.Contains(path, "/manifests/") {
-				if ok, reason := db.CheckAndConsumeUserQuota(username); !ok {
-					c.String(http.StatusTooManyRequests, reason)
-					return
-				}
-			}
+		}
+	}
+
+	// 扣减用户月度配额（只在拉取 manifest 时扣减，避免 blob 下载每个分块重复计费）
+	if username != "anonymous" && strings.Contains(path, "/manifests/") {
+		if ok, reason := db.CheckAndConsumeUserQuota(username); !ok {
+			c.String(http.StatusTooManyRequests, reason)
+			return
 		}
 	}
 
