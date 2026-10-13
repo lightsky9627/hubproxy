@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"hubproxy/config"
+	"hubproxy/db"
 	"hubproxy/utils"
 )
 
@@ -686,11 +688,61 @@ func formatPlatformText(platform string) string {
 // InitImageTarRoutes 初始化镜像下载路由
 func InitImageTarRoutes(router *gin.Engine) {
 	imageAPI := router.Group("/api/image")
+	imageAPI.Use(ImageDownloadAuthMiddleware())
 	{
 		imageAPI.GET("/download/:image", handleDirectImageDownload)
 		imageAPI.GET("/info/:image", handleImageInfo)
 		imageAPI.GET("/batch", handleSimpleBatchDownload)
 		imageAPI.POST("/batch", handleSimpleBatchDownload)
+	}
+}
+
+// ImageDownloadAuthMiddleware 校验镜像离线下载的权限与配额
+func ImageDownloadAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenStr := ""
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
+		} else if qToken := c.Query("token"); qToken != "" {
+			tokenStr = qToken
+		}
+
+		if tokenStr != "" {
+			claims, err := ParseLocalToken(tokenStr)
+			if err == nil && claims.Username != "" {
+				// 已登录用户，扣减月度配额
+				if ok, reason := db.CheckAndConsumeUserQuota(claims.Username); !ok {
+					c.JSON(http.StatusTooManyRequests, gin.H{"error": reason})
+					c.Abort()
+					return
+				}
+				c.Set("download_user", claims.Username)
+				c.Next()
+				return
+			}
+		}
+
+		// 未登录/匿名下载
+		allowAnonymous := db.GetSetting("allow_anonymous", "true") == "true"
+		if !allowAnonymous {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "系统已禁止匿名拉取/下载镜像，请先登录用户账号"})
+			c.Abort()
+			return
+		}
+
+		// 检查匿名月度限额
+		anonLimitStr := db.GetSetting("anonymous_monthly_quota", "50")
+		anonLimit, _ := strconv.ParseInt(anonLimitStr, 10, 64)
+		clientIP := c.ClientIP()
+		if ok, reason := db.CheckAndConsumeIPQuota(clientIP, anonLimit); !ok {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": reason})
+			c.Abort()
+			return
+		}
+
+		c.Set("download_user", "anonymous")
+		c.Next()
 	}
 }
 

@@ -230,6 +230,26 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		return
 	}
 
+	// 如果禁止匿名拉取，且当前未认证为本地用户，则直接要求认证返回 401
+	if username == "anonymous" {
+		allowAnonymous := db.GetSetting("allow_anonymous", "true") == "true"
+		if !allowAnonymous {
+			target, _ := resolveRegistryTarget(c, strings.TrimPrefix(path, "/v2/"))
+			baseURL := publicBaseURL(c)
+			c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s/token/%s",service="%s",error="unauthorized"`, baseURL, target.Name, target.AuthService))
+			c.Header("Docker-Distribution-API-Version", "registry/2.0")
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"errors": []gin.H{
+					{
+						"code":    "UNAUTHORIZED",
+						"message": "authentication required: anonymous pull is disabled",
+					},
+				},
+			})
+			return
+		}
+	}
+
 	handleRegistryRequest(c, path)
 
 	// 记录拉取日志
