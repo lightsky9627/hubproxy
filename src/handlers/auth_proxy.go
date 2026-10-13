@@ -187,7 +187,9 @@ func fetchUpstreamTokenWithCred(target registryTarget, scope, username, password
 	if err != nil {
 		return "", err
 	}
-	req.SetBasicAuth(username, password)
+	if username != "" || password != "" {
+		req.SetBasicAuth(username, password)
+	}
 
 	resp, err := utils.GetGlobalHTTPClient().Do(req)
 	if err != nil {

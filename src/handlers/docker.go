@@ -507,6 +507,23 @@ func proxyRegistryHTTP(c *gin.Context, target registryTarget, upstreamPath strin
 						req.Header.Set("Authorization", "Bearer "+finalTok)
 					}
 				}
+			} else {
+				// 如果服务端没有配置专门的 upstreamCred，以匿名身份向上游 registry 换取临时上游 token
+				anonToken, err := fetchUpstreamTokenWithCred(target, scope, "", "")
+				if err == nil && anonToken != "" {
+					var tokStruct struct {
+						Token       string `json:"token"`
+						AccessToken string `json:"access_token"`
+					}
+					_ = json.Unmarshal([]byte(anonToken), &tokStruct)
+					finalTok := tokStruct.Token
+					if finalTok == "" {
+						finalTok = tokStruct.AccessToken
+					}
+					if finalTok != "" {
+						req.Header.Set("Authorization", "Bearer "+finalTok)
+					}
+				}
 			}
 			_ = claims // used
 		}
