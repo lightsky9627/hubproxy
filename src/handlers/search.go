@@ -302,16 +302,7 @@ func searchCatalogRegistry(ctx context.Context, registry, query string, page, pa
 		}
 	}
 
-	// 如果没有完全精确匹配，但用户输入了明确名字，允许直接返回构造项目
-	if len(matched) == 0 && query != "" {
-		matched = append(matched, Repository{
-			Name:        registry + "/" + query,
-			Description: fmt.Sprintf("%s 镜像: %s", registry, query),
-			StarCount:   0,
-			IsOfficial:  false,
-		})
-	}
-
+	// 如果没有找到匹配的镜像，直接返回空结果，而不是生成空镜像名
 	return &SearchResult{
 		Count:   len(matched),
 		Results: matched,

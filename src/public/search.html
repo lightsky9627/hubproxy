@@ -227,14 +227,16 @@
           const isOfficial = item.is_official;
           const stars = item.star_count || 0;
           const desc = item.description || '暂无详细描述';
-          const rawName = item.name || '';
-          const namespace = item.namespace || '';
+          const rawName = (item.name || '').trim();
+
+          // 严格防止空镜像名
+          if (!rawName || rawName === registry || rawName === registry + '/') {
+            return '';
+          }
 
           let displayImage = rawName;
           if (registry === 'docker.io') {
-            if (rawName && !rawName.includes('/')) {
-              displayImage = isOfficial ? rawName : rawName;
-            }
+            displayImage = rawName;
           } else {
             // 非 docker.io 仓库（如 quay.io, ghcr.io, gcr.io 等）
             if (rawName.startsWith(registry + '/')) {
@@ -242,10 +244,6 @@
             } else {
               displayImage = `${registry}/${rawName}`;
             }
-          }
-
-          if (!displayImage) {
-            displayImage = 'nginx';
           }
 
           const pullCmd = `docker pull ${host}/${displayImage}:latest`;
