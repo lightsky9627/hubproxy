@@ -156,6 +156,24 @@ func registryTargetFromMapping(name string, mapping config.RegistryMapping) regi
 func resolveRegistryTarget(c *gin.Context, pathWithoutV2 string) (registryTarget, string) {
 	cfg := config.GetConfig()
 
+	// 1. 优先根据二级域名识别上游 Registry (例如 k8s.hub.bravexist.cn -> registry.k8s.io, ghcr.hub.bravexist.cn -> ghcr.io)
+	reqHost := c.Request.Host
+	if colonIdx := strings.Index(reqHost, ":"); colonIdx != -1 {
+		reqHost = reqHost[:colonIdx]
+	}
+	hostParts := strings.Split(reqHost, ".")
+	if len(hostParts) >= 3 {
+		sub := hostParts[0]
+		targetRegistry := mapSubdomainToRegistry(sub)
+		if targetRegistry != "" {
+			if mapping, exists := cfg.Registries[targetRegistry]; exists && mapping.Enabled {
+				// 如果路径里还带有 targetRegistry 前缀，剥除它
+				cleanPath := strings.TrimPrefix(pathWithoutV2, targetRegistry+"/")
+				return registryTargetFromMapping(targetRegistry, mapping), cleanPath
+			}
+		}
+	}
+
 	if ns := strings.TrimSpace(c.Query("ns")); ns != "" {
 		if mapping, exists := cfg.Registries[ns]; exists && mapping.Enabled {
 			return registryTargetFromMapping(ns, mapping), pathWithoutV2
@@ -171,7 +189,46 @@ func resolveRegistryTarget(c *gin.Context, pathWithoutV2 string) (registryTarget
 	return defaultRegistryTarget(), pathWithoutV2
 }
 
+// 将二级子域名前缀映射到官方标准 Registry
+func mapSubdomainToRegistry(sub string) string {
+	switch strings.ToLower(sub) {
+	case "k8s", "registry":
+		return "registry.k8s.io"
+	case "ghcr":
+		return "ghcr.io"
+	case "gcr":
+		return "gcr.io"
+	case "quay":
+		return "quay.io"
+	case "mcr":
+		return "mcr.microsoft.com"
+	case "nvcr":
+		return "nvcr.io"
+	case "elastic":
+		return "docker.elastic.co"
+	default:
+		return ""
+	}
+}
+
 func resolveTokenTarget(c *gin.Context) (registryTarget, bool) {
+	// 优先根据 Host 头判定（例如客户端向 k8s.hub.bravexist.cn 请求 token）
+	reqHost := c.Request.Host
+	if colonIdx := strings.Index(reqHost, ":"); colonIdx != -1 {
+		reqHost = reqHost[:colonIdx]
+	}
+	hostParts := strings.Split(reqHost, ".")
+	if len(hostParts) >= 3 {
+		sub := hostParts[0]
+		targetRegistry := mapSubdomainToRegistry(sub)
+		if targetRegistry != "" {
+			cfg := config.GetConfig()
+			if mapping, exists := cfg.Registries[targetRegistry]; exists && mapping.Enabled {
+				return registryTargetFromMapping(targetRegistry, mapping), true
+			}
+		}
+	}
+
 	name := strings.Trim(strings.TrimSpace(c.Param("path")), "/")
 	if name == "" || isDockerHubAlias(name) {
 		return inferTokenTargetFromScope(c.Query("scope"))
@@ -258,7 +315,7 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		}
 	}
 
-	// 检查二级专属域名是否直接合法（如果是专属域名用户，/v2/ 探测也视为登录成功）
+	// 检查二级专属域名是否直接合法（如果是仓库子域名如 k8s.hub.bravexist.cn，必须通过认证；如果是普通用户专属域名，/v2/ 探测视为登录成功）
 	reqHost := c.Request.Host
 	if colonIdx := strings.Index(reqHost, ":"); colonIdx != -1 {
 		reqHost = reqHost[:colonIdx]
@@ -266,7 +323,17 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 	hostParts := strings.Split(reqHost, ".")
 	if len(hostParts) >= 3 {
 		sub := hostParts[0]
-		if sub != "www" && sub != "hub" && sub != "api" {
+		if mapSubdomainToRegistry(sub) != "" {
+			if path == "/v2/" {
+				// 针对仓库专用子域名，/v2/ 探测要求登录挑战
+				challengeService := c.Request.Host
+				baseURL := publicBaseURL(c)
+				c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s/token",service="%s",error="unauthorized"`, baseURL, challengeService))
+				c.Header("Docker-Distribution-API-Version", "registry/2.0")
+				c.JSON(http.StatusUnauthorized, gin.H{"errors": []gin.H{{"code": "UNAUTHORIZED", "message": "authentication required"}}})
+				return
+			}
+		} else if sub != "www" && sub != "hub" && sub != "api" {
 			if user, err := db.GetUserByUsername(sub); err == nil && user != nil && user.IsEnabled {
 				if user.ExpiresAt == nil || time.Now().Before(*user.ExpiresAt) {
 					if path == "/v2/" {
@@ -294,10 +361,13 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		host = host[:colonIdx]
 	}
 	parts := strings.Split(host, ".")
+	isRegistrySubdomain := false
 	if len(parts) >= 3 {
 		// 形如 <subdomain>.hub.bravexist.cn，提取前缀子域名
 		subdomain := parts[0]
-		if subdomain != "www" && subdomain != "hub" && subdomain != "api" {
+		if mapSubdomainToRegistry(subdomain) != "" {
+			isRegistrySubdomain = true
+		} else if subdomain != "www" && subdomain != "hub" && subdomain != "api" {
 			// 检查是否存在对应的用户空间
 			if user, err := db.GetUserByUsername(subdomain); err == nil && user != nil && user.IsEnabled {
 				username = user.Username
@@ -310,6 +380,24 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		if claims, err := ParseLocalToken(tokenStr); err == nil && claims.Username != "" {
 			username = claims.Username
 		}
+	}
+
+	// 针对仓库专用子域名（如 k8s.hub.bravexist.cn），必须是已登录有效用户，禁止匿名拉取
+	if isRegistrySubdomain && username == "anonymous" {
+		target, _ := resolveRegistryTarget(c, strings.TrimPrefix(path, "/v2/"))
+		baseURL := publicBaseURL(c)
+		challengeService := c.Request.Host
+		c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s/token",service="%s",error="unauthorized"`, baseURL, challengeService))
+		c.Header("Docker-Distribution-API-Version", "registry/2.0")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"errors": []gin.H{
+				{
+					"code":    "UNAUTHORIZED",
+					"message": "authentication required for " + target.Name + " registry",
+				},
+			},
+		})
+		return
 	}
 
 	// 扣减用户月度配额（只在拉取 manifest 时扣减，避免 blob 下载每个分块重复计费）

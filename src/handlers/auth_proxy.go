@@ -63,17 +63,21 @@ func HandleDockerAuthToken(c *gin.Context) {
 		service = target.AuthService
 	}
 
-	// 0. 优先检测二级专属泛域名 (形如 <subdomain>.hub.bravexist.cn)
-	// 专属二级域名无需密码，直接免登录签发对应用户 Token！
+	// 0. 检查是否为仓库专用子域名（如 k8s.hub.bravexist.cn, ghcr.hub.bravexist.cn 等）
+	// 针对仓库专用子域名，强制要求必须携带本地用户 Basic Auth 认证！
 	host := c.Request.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
 	parts := strings.Split(host, ".")
+	isRegistrySubdomain := false
 	if len(parts) >= 3 {
-		subdomain := parts[0]
-		if subdomain != "www" && subdomain != "hub" && subdomain != "api" {
-			if user, err := db.GetUserByUsername(subdomain); err == nil && user != nil && user.IsEnabled {
+		sub := parts[0]
+		if mapSubdomainToRegistry(sub) != "" {
+			isRegistrySubdomain = true
+		} else if sub != "www" && sub != "hub" && sub != "api" {
+			// 普通用户个人空间子域名（如 qiankong.hub.bravexist.cn）免密签发
+			if user, err := db.GetUserByUsername(sub); err == nil && user != nil && user.IsEnabled {
 				if user.ExpiresAt == nil || time.Now().Before(*user.ExpiresAt) {
 					access := parseAccessFromScope(scope)
 					token, err := GenerateLocalToken(user.Username, user.IsAdmin, service, access, 4*time.Hour)
@@ -124,6 +128,14 @@ func HandleDockerAuthToken(c *gin.Context) {
 			})
 			return
 		}
+	}
+
+	// 如果访问的是仓库子域名（如 k8s.hub.bravexist.cn），且未通过本地用户认证，直接拒绝并要求 docker login！
+	if isRegistrySubdomain {
+		realm := fmt.Sprintf("%s://%s/token", getScheme(c), c.Request.Host)
+		c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s",service="%s",error="unauthorized"`, realm, service))
+		c.String(http.StatusUnauthorized, "Unauthorized: authentication required for registry subdomain")
+		return
 	}
 
 	// 2. 如果携带了基础认证，但不是本地用户，检查是否允许透传到 DockerHub/上游
