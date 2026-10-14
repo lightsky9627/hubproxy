@@ -596,6 +596,8 @@
           document.getElementById('tagsTotalCount').textContent = currentDetail.tagsTotal;
 
           renderTagsList(list);
+          // 获取到标签列表后，自动校准顶部拉取命令框中的 Tag（若无 latest 则自动选用真实最新版本）
+          updateDetailPullCommand();
 
           // 分页控制器
           const totalPages = Math.ceil(currentDetail.tagsTotal / 10);
@@ -784,11 +786,20 @@
     }
 
     function updateDetailPullCommand() {
+      // 优先从 tagsList 中挑选最佳 tag：若有 latest 则用 latest，否则用最新发布的具体版本（如 v1.11.1）
+      let targetTag = 'latest';
+      if (currentDetail.tagsList && currentDetail.tagsList.length > 0) {
+        const hasLatest = currentDetail.tagsList.some(t => (t.tag_name || t.name) === 'latest');
+        if (!hasLatest) {
+          targetTag = currentDetail.tagsList[0].tag_name || currentDetail.tagsList[0].name || 'latest';
+        }
+      }
+
       let cmd = '';
       if (currentDetail.pullMode === 'original') {
-        cmd = `docker pull ${currentDetail.registry === 'docker.io' ? '' : currentDetail.registry + '/'}${currentDetail.repository}:latest`;
+        cmd = `docker pull ${currentDetail.registry === 'docker.io' ? '' : currentDetail.registry + '/'}${currentDetail.repository}:${targetTag}`;
       } else {
-        cmd = buildTagPullCommand(currentDetail.registry, currentDetail.repository, 'latest');
+        cmd = buildTagPullCommand(currentDetail.registry, currentDetail.repository, targetTag);
       }
       document.getElementById('detailPullCmdBox').textContent = cmd;
     }
