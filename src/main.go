@@ -56,7 +56,6 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 	router.Use(utils.RateLimitMiddleware(globalLimiter))
 
 	initHealthRoutes(router)
-	handlers.InitImageTarRoutes(router)
 
 	if cfg.Server.EnableFrontend {
 		router.GET("/", func(c *gin.Context) {
@@ -66,24 +65,28 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 			filepath := strings.TrimPrefix(c.Param("filepath"), "/")
 			serveEmbedFile(c, "public/"+filepath)
 		})
-		router.GET("/images.html", func(c *gin.Context) {
-			serveEmbedFile(c, "public/images.html")
-		})
 		router.GET("/search.html", func(c *gin.Context) {
 			serveEmbedFile(c, "public/search.html")
 		})
-		router.GET("/admin", func(c *gin.Context) {
-			serveEmbedFile(c, "public/admin.html")
-		})
+		
+		// 动态管理后台路径 (由配置 server.adminPath 控制，默认 /admin，可设自定义路径或空)
+		adminPath := cfg.Server.AdminPath
+		if adminPath != "" {
+			if !strings.HasPrefix(adminPath, "/") {
+				adminPath = "/" + adminPath
+			}
+			router.GET(adminPath, func(c *gin.Context) {
+				serveEmbedFile(c, "public/admin.html")
+			})
+		}
+
 		router.GET("/favicon.ico", func(c *gin.Context) {
 			serveEmbedFile(c, "public/favicon.ico")
 		})
 	} else {
 		router.GET("/", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 		router.GET("/public/*filepath", func(c *gin.Context) { c.Status(http.StatusNotFound) })
-		router.GET("/images.html", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 		router.GET("/search.html", func(c *gin.Context) { c.Status(http.StatusNotFound) })
-		router.GET("/admin", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 		router.GET("/favicon.ico", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 	}
 
@@ -118,8 +121,6 @@ func main() {
 	utils.InitHTTPClients()
 	globalLimiter = utils.InitGlobalLimiter()
 	handlers.InitDockerProxy()
-	handlers.InitImageStreamer()
-	handlers.InitDebouncer()
 
 	cfg := config.GetConfig()
 	router := buildRouter(cfg)

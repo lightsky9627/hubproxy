@@ -43,15 +43,12 @@
         </div>
         <div class="flex items-baseline space-x-1.5">
           <span class="font-bold text-base tracking-tight text-slate-900 dark:text-white">HubProxy</span>
-          <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">Search</span>
+          <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">Hub</span>
         </div>
       </a>
 
       <nav class="hidden sm:flex items-center space-x-1 text-sm font-medium text-slate-600 dark:text-slate-300">
-        <a href="/" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">首页</a>
-        <a href="/search.html" class="px-3 py-1.5 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/40">镜像检索</a>
-        <a href="/images.html" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">离线打包</a>
-        <a href="/admin" class="px-3 py-1.5 rounded-md hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">控制台</a>
+        <a href="/" class="px-3 py-1.5 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/40">镜像检索</a>
       </nav>
     </div>
 
@@ -60,10 +57,10 @@
         <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
         <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
       </button>
-      <a href="/admin" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-sm transition flex items-center space-x-1">
-        <i data-lucide="user" class="w-3.5 h-3.5"></i>
-        <span>Console</span>
-      </a>
+      <button onclick="openUserLoginModal()" class="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium text-xs shadow-sm transition flex items-center space-x-1.5">
+        <i data-lucide="log-in" class="w-3.5 h-3.5 text-blue-600"></i>
+        <span id="userStatusText">客户端登录</span>
+      </button>
     </div>
   </header>
 
@@ -77,6 +74,7 @@
         <select id="registrySelect" class="bg-slate-50/80 dark:bg-slate-800/70 border-r border-slate-200 dark:border-slate-800 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none cursor-pointer hover:bg-slate-100 transition">
           <option value="docker.io">Docker Hub (官方)</option>
           <option value="quay.io">Quay.io (RedHat)</option>
+          <option value="ghcr.io">GitHub (GHCR)</option>
         </select>
 
         <!-- 输入框 -->
@@ -105,7 +103,7 @@
           <i data-lucide="compass" class="w-7 h-7"></i>
         </div>
         <h3 class="font-bold text-base text-slate-700 dark:text-slate-200">全网容器镜像快速检索</h3>
-        <p class="text-xs text-slate-400 max-w-sm mx-auto">输入关键词即可检索上游 Docker Hub 与各类 Registry 镜像，点击直接获取加速拉取命令与离线导出。</p>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto">输入关键词即可检索上游 Docker Hub、Quay 及 GHCR 镜像，点击直接获取加速拉取命令。</p>
       </div>
 
       <!-- Loading -->
@@ -119,6 +117,47 @@
     </div>
 
   </main>
+
+  <!-- 普通用户客户端指南/登录弹窗 -->
+  <div id="userLoginModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
+            <i data-lucide="terminal" class="w-4 h-4"></i>
+          </div>
+          <h3 class="font-bold text-base text-slate-900 dark:text-white">客户端接入指南</h3>
+        </div>
+        <button onclick="closeUserLoginModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-600 dark:text-slate-300">
+        <p>HubProxy 支持标准 Docker 客户端免配或凭证认证：</p>
+        <div class="space-y-2">
+          <div class="font-semibold text-slate-800 dark:text-slate-200">1. 终端登录（若管理员启用了配额或私有访问）</div>
+          <div class="p-2.5 bg-slate-100 dark:bg-slate-800 font-mono rounded border border-slate-200/60 dark:border-slate-700/60 select-all">
+            docker login hub.bravexist.cn
+          </div>
+          <div class="text-[11px] text-slate-400">输入管理员为您分配的用户名与密码即可。</div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="font-semibold text-slate-800 dark:text-slate-200">2. 专属二级域名免前缀直拉</div>
+          <div class="p-2.5 bg-slate-100 dark:bg-slate-800 font-mono rounded border border-slate-200/60 dark:border-slate-700/60 select-all">
+            docker pull &lt;username&gt;.hub.bravexist.cn/nginx:latest
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button onclick="closeUserLoginModal()" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition">
+          我知道了
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // Theme Handler
@@ -179,19 +218,34 @@
 
         document.getElementById('searchResultSummary').textContent = `共找到 ${data.count || data.results.length} 个结果`;
 
-        document.getElementById('repoList').innerHTML = data.results.map(item => {
+        document.getElementById('repoList').innerHTML = data.results.map((item, idx) => {
           const isOfficial = item.is_official;
           const stars = item.star_count || 0;
           const desc = item.description || '暂无详细描述';
-          const name = item.name;
-          const pullCmd = `docker pull ${host}/${name}:latest`;
+          const rawName = item.name || '';
+          const namespace = item.namespace || '';
+
+          let displayImage = rawName;
+          if (rawName && !rawName.includes('/')) {
+            if (isOfficial) {
+              displayImage = rawName;
+            } else if (namespace) {
+              displayImage = `${namespace}/${rawName}`;
+            }
+          }
+          if (!displayImage) {
+            displayImage = 'nginx';
+          }
+
+          const pullCmd = `docker pull ${host}/${displayImage}:latest`;
+          const btnId = `copy-btn-${idx}`;
 
           return `
             <div class="p-4 sm:p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-500/70 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
               <div class="space-y-1.5 flex-1 min-w-0">
                 <div class="flex items-center space-x-2 flex-wrap">
-                  <span class="font-bold text-sm sm:text-base text-slate-800 dark:text-white truncate">${name}</span>
-                  ${isOfficial ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">官方镜像</span>` : ''}
+                  <span class="font-bold text-sm sm:text-base text-slate-800 dark:text-white truncate">${displayImage}</span>
+                  ${isOfficial ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">官方认证</span>` : ''}
                   <span class="text-xs text-amber-500 flex items-center space-x-0.5">
                     <i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>
                     <span>${stars}</span>
@@ -206,14 +260,10 @@
               </div>
 
               <div class="flex items-center space-x-2 shrink-0">
-                <button onclick="copyCommand('${pullCmd}')" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center space-x-1 transition">
+                <button id="${btnId}" onclick="copyCommand('${pullCmd}', '${btnId}')" class="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center space-x-1.5 transition">
                   <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                   <span>复制拉取</span>
                 </button>
-                <a href="/images.html?image=${encodeURIComponent(name)}" class="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 text-blue-600 dark:text-blue-400 text-xs font-medium flex items-center space-x-1 transition">
-                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                  <span>离线 Tar</span>
-                </a>
               </div>
             </div>
           `;
@@ -229,9 +279,37 @@
       }
     }
 
-    function copyCommand(text) {
-      navigator.clipboard.writeText(text);
-      alert('拉取命令已复制到剪贴板！');
+    function copyCommand(text, btnId) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+          const original = btn.innerHTML;
+          btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i><span class="text-emerald-500 font-semibold">已复制</span>`;
+          lucide.createIcons();
+          setTimeout(() => {
+            btn.innerHTML = original;
+            lucide.createIcons();
+          }, 1500);
+        }
+      }).catch(() => {
+        // Fallback for older browsers
+        const input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      });
+    }
+
+    // 普通用户弹窗控制
+    function openUserLoginModal() {
+      const modal = document.getElementById('userLoginModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+    function closeUserLoginModal() {
+      const modal = document.getElementById('userLoginModal');
+      if (modal) modal.classList.add('hidden');
     }
 
     window.addEventListener('DOMContentLoaded', () => {

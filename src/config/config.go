@@ -24,7 +24,7 @@ type AppConfig struct {
 	Server struct {
 		Host           string `toml:"host"`
 		Port           int    `toml:"port"`
-		FileSize       int64  `toml:"fileSize"`
+		AdminPath      string `toml:"adminPath"` // 自定义管理后台路径，如 "/admin" 或 "/my-secret-admin"
 		EnableH2C      bool   `toml:"enableH2C"`
 		EnableFrontend bool   `toml:"enableFrontend"`
 	} `toml:"server"`
@@ -73,13 +73,13 @@ func DefaultConfig() *AppConfig {
 		Server: struct {
 			Host           string `toml:"host"`
 			Port           int    `toml:"port"`
-			FileSize       int64  `toml:"fileSize"`
+			AdminPath      string `toml:"adminPath"`
 			EnableH2C      bool   `toml:"enableH2C"`
 			EnableFrontend bool   `toml:"enableFrontend"`
 		}{
 			Host:           "0.0.0.0",
 			Port:           5000,
-			FileSize:       2 * 1024 * 1024 * 1024,
+			AdminPath:      "/admin",
 			EnableH2C:      false,
 			EnableFrontend: true,
 		},
@@ -232,6 +232,9 @@ func overrideFromEnv(cfg *AppConfig) {
 			cfg.Server.Port = port
 		}
 	}
+	if val := os.Getenv("ADMIN_PATH"); val != "" {
+		cfg.Server.AdminPath = strings.TrimSpace(val)
+	}
 	if val := os.Getenv("ENABLE_H2C"); val != "" {
 		if enable, err := strconv.ParseBool(val); err == nil {
 			cfg.Server.EnableH2C = enable
@@ -240,11 +243,6 @@ func overrideFromEnv(cfg *AppConfig) {
 	if val := os.Getenv("ENABLE_FRONTEND"); val != "" {
 		if enable, err := strconv.ParseBool(val); err == nil {
 			cfg.Server.EnableFrontend = enable
-		}
-	}
-	if val := os.Getenv("MAX_FILE_SIZE"); val != "" {
-		if size, err := strconv.ParseInt(val, 10, 64); err == nil && size > 0 {
-			cfg.Server.FileSize = size
 		}
 	}
 

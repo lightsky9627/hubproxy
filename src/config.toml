@@ -3,8 +3,8 @@
 host = "0.0.0.0"
 # 监听端口
 port = 5000
-# Github文件大小限制（字节），默认2GB
-fileSize = 2147483648
+# 管理后台自定义路径（默认 /admin，可自定义如 /my-secret-admin；若设为空则完全关闭后台）
+adminPath = "/admin"
 # HTTP/2 多路复用
 enableH2C = false
 enableFrontend = true
@@ -32,27 +32,19 @@ blackList = [
 ]
 
 [access]
-# 代理服务白名单（支持GitHub仓库和Docker镜像，支持通配符）
-# 只允许访问白名单中的仓库/镜像，为空时不限制
+# 镜像代理白名单（为空时不限制）
 whiteList = []
 
-# 代理服务黑名单（支持GitHub仓库和Docker镜像，支持通配符）
-# 禁止访问黑名单中的仓库/镜像
+# 镜像代理黑名单
 blackList = [
     "baduser/malicious-repo",
     "*/malicious-repo",
     "baduser/*"
 ]
 
-# 代理配置，支持有用户名/密码认证和无认证模式
-# 无认证: socks5://127.0.0.1:1080
-# 有认证: socks5://username:password@127.0.0.1:1080
+# 代理配置，支持 socks5 / http 代理
 # 留空不使用代理
 proxy = "" 
-
-[download]
-# 批量下载离线镜像数量限制
-maxImages = 10
 
 # Registry映射配置，支持多种镜像仓库上游
 [registries]

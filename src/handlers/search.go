@@ -183,6 +183,48 @@ func normalizeRepository(repo *Repository) {
 	}
 }
 
+// searchGHCR 搜索 GitHub Packages / GHCR 镜像
+func searchGHCR(ctx context.Context, query string, page, pageSize int) (*SearchResult, error) {
+	url := fmt.Sprintf("https://api.github.com/search/repositories?q=%s+in:name,description&sort=stars&order=desc&page=%d&per_page=%d", url.QueryEscape(query), page, pageSize)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "HubProxy-Search")
+
+	resp, err := utils.GetSearchHTTPClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var ghResp struct {
+		TotalCount int `json:"total_count"`
+		Items      []struct {
+			FullName    string `json:"full_name"`
+			Description string `json:"description"`
+			Stargazers  int    `json:"stargazers_count"`
+		} `json:"items"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&ghResp); err != nil {
+		return nil, err
+	}
+
+	result := &SearchResult{
+		Count: ghResp.TotalCount,
+	}
+	for _, it := range ghResp.Items {
+		result.Results = append(result.Results, Repository{
+			Name:        "ghcr.io/" + it.FullName,
+			Description: it.Description,
+			StarCount:   it.Stargazers,
+			IsOfficial:  false,
+		})
+	}
+	return result, nil
+}
+
 // searchQuay 搜索 Quay.io 镜像
 func searchQuay(ctx context.Context, query string, page, pageSize int) (*SearchResult, error) {
 	url := fmt.Sprintf("https://quay.io/api/v1/find/repositories?query=%s", url.QueryEscape(query))
@@ -529,6 +571,16 @@ func RegisterSearchRoute(r *gin.Engine) {
 
 		if registry == "quay.io" {
 			result, err := searchQuay(c.Request.Context(), query, page, pageSize)
+			if err != nil {
+				sendErrorResponse(c, err.Error())
+				return
+			}
+			c.JSON(http.StatusOK, result)
+			return
+		}
+
+		if registry == "ghcr.io" {
+			result, err := searchGHCR(c.Request.Context(), query, page, pageSize)
 			if err != nil {
 				sendErrorResponse(c, err.Error())
 				return

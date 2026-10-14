@@ -31,8 +31,6 @@ func newTestRouter(t *testing.T, configBody string) *gin.Engine {
 	utils.InitHTTPClients()
 	globalLimiter = utils.InitGlobalLimiter()
 	handlers.InitDockerProxy()
-	handlers.InitImageStreamer()
-	handlers.InitDebouncer()
 
 	return buildRouter(config.GetConfig())
 }
@@ -80,55 +78,15 @@ enableFrontend = false
 }
 
 func TestSingleImageDownloadPrepareReturnsURL(t *testing.T) {
-	router := newTestRouter(t, "")
-
-	w := performRequest(router, http.MethodGet, "/api/image/download/nginx?mode=prepare", "")
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
-	}
-
-	var got struct {
-		DownloadURL string `json:"download_url"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(got.DownloadURL, "/api/image/download/nginx?token=") {
-		t.Fatalf("download_url = %q", got.DownloadURL)
-	}
+	t.Skip("Image tar download handler removed")
 }
 
 func TestBatchImageDownloadPrepareReturnsURL(t *testing.T) {
-	router := newTestRouter(t, "")
-
-	body := `{"images":["nginx"],"useCompressedLayers":true}`
-	w := performRequest(router, http.MethodPost, "/api/image/batch?mode=prepare", body)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
-	}
-
-	var got struct {
-		DownloadURL string `json:"download_url"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(got.DownloadURL, "/api/image/batch?token=") {
-		t.Fatalf("download_url = %q", got.DownloadURL)
-	}
+	t.Skip("Image tar download handler removed")
 }
 
 func TestBatchImageDownloadRejectsTooManyImages(t *testing.T) {
-	router := newTestRouter(t, `
-[download]
-maxImages = 1
-`)
-
-	body := `{"images":["nginx","redis"],"useCompressedLayers":true}`
-	w := performRequest(router, http.MethodPost, "/api/image/batch?mode=prepare", body)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400; body=%s", w.Code, w.Body.String())
-	}
+	t.Skip("Image tar download handler removed")
 }
 
 func TestGitHubNoRouteRejectsUnsupportedHost(t *testing.T) {
