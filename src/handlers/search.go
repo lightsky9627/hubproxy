@@ -216,7 +216,7 @@ func searchGHCR(ctx context.Context, query string, page, pageSize int) (*SearchR
 	}
 	for _, it := range ghResp.Items {
 		result.Results = append(result.Results, Repository{
-			Name:        "ghcr.io/" + it.FullName,
+			Name:        it.FullName,
 			Description: it.Description,
 			StarCount:   it.Stargazers,
 			IsOfficial:  false,
@@ -294,7 +294,7 @@ func searchCatalogRegistry(ctx context.Context, registry, query string, page, pa
 	for _, it := range list {
 		if strings.Contains(strings.ToLower(it.Name), lowerQ) || strings.Contains(strings.ToLower(it.Desc), lowerQ) {
 			matched = append(matched, Repository{
-				Name:        registry + "/" + it.Name,
+				Name:        it.Name,
 				Description: it.Desc,
 				StarCount:   100,
 				IsOfficial:  true,
@@ -302,7 +302,6 @@ func searchCatalogRegistry(ctx context.Context, registry, query string, page, pa
 		}
 	}
 
-	// 如果没有找到匹配的镜像，直接返回空结果，而不是生成空镜像名
 	return &SearchResult{
 		Count:   len(matched),
 		Results: matched,

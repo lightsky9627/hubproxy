@@ -227,23 +227,21 @@
           const isOfficial = item.is_official;
           const stars = item.star_count || 0;
           const desc = item.description || '暂无详细描述';
-          const rawName = (item.name || '').trim();
+          let rawName = (item.name || '').trim();
 
           // 严格防止空镜像名
           if (!rawName || rawName === registry || rawName === registry + '/') {
             return '';
           }
 
+          // 如果 rawName 已经包含了 registry 前缀，先去掉以防重复
+          if (registry !== 'docker.io' && rawName.startsWith(registry + '/')) {
+            rawName = rawName.substring(registry.length + 1);
+          }
+
           let displayImage = rawName;
-          if (registry === 'docker.io') {
-            displayImage = rawName;
-          } else {
-            // 非 docker.io 仓库（如 quay.io, ghcr.io, gcr.io 等）
-            if (rawName.startsWith(registry + '/')) {
-              displayImage = rawName;
-            } else {
-              displayImage = `${registry}/${rawName}`;
-            }
+          if (registry !== 'docker.io') {
+            displayImage = `${registry}/${rawName}`;
           }
 
           const pullCmd = `docker pull ${host}/${displayImage}:latest`;
