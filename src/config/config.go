@@ -136,6 +136,24 @@ func DefaultConfig() *AppConfig {
 				AuthType: "anonymous",
 				Enabled:  true,
 			},
+			"mcr.microsoft.com": {
+				Upstream: "mcr.microsoft.com",
+				AuthHost: "mcr.microsoft.com",
+				AuthType: "anonymous",
+				Enabled:  true,
+			},
+			"nvcr.io": {
+				Upstream: "nvcr.io",
+				AuthHost: "nvcr.io",
+				AuthType: "anonymous",
+				Enabled:  true,
+			},
+			"docker.elastic.co": {
+				Upstream: "docker.elastic.co",
+				AuthHost: "docker.elastic.co",
+				AuthType: "anonymous",
+				Enabled:  true,
+			},
 		},
 		TokenCache: struct {
 			Enabled    bool   `toml:"enabled"`

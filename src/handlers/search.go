@@ -225,6 +225,99 @@ func searchGHCR(ctx context.Context, query string, page, pageSize int) (*SearchR
 	return result, nil
 }
 
+// searchCatalogRegistry 处理 mcr.microsoft.com, gcr.io, registry.k8s.io, nvcr.io 等仓库镜像检索
+func searchCatalogRegistry(ctx context.Context, registry, query string, page, pageSize int) (*SearchResult, error) {
+	// 常见常用镜像字典（当上游无全局全文检索 API 时，提供高频关键词与镜像映射，保障检索极速响应）
+	catalogMap := map[string][]struct {
+		Name string
+		Desc string
+	}{
+		"mcr.microsoft.com": {
+			{"dotnet/runtime", "Official .NET Runtime images"},
+			{"dotnet/sdk", "Official .NET SDK images"},
+			{"dotnet/aspnet", "Official ASP.NET Core runtime images"},
+			{"mssql/server", "Microsoft SQL Server on Linux"},
+			{"azure-cli", "Azure CLI Docker image"},
+			{"playwright", "Playwright testing environment"},
+			{"windows/servercore", "Windows Server Core base image"},
+			{"windows/nanoserver", "Windows Nano Server base image"},
+			{"powershell", "PowerShell Core container"},
+		},
+		"gcr.io": {
+			{"distroless/static-debian12", "Distroless static base image"},
+			{"distroless/base-debian12", "Distroless minimal base image"},
+			{"distroless/java17-debian12", "Distroless Java runtime image"},
+			{"distroless/nodejs20-debian12", "Distroless Node.js runtime image"},
+			{"distroless/python3-debian12", "Distroless Python runtime image"},
+			{"kaniko-project/executor", "Kaniko image builder for Kubernetes"},
+			{"google-containers/pause", "Kubernetes pause container"},
+			{"cloud-builders/docker", "Google Cloud Build Docker runner"},
+			{"cloud-builders/git", "Google Cloud Build Git runner"},
+		},
+		"registry.k8s.io": {
+			{"kube-apiserver", "Kubernetes API Server"},
+			{"kube-controller-manager", "Kubernetes Controller Manager"},
+			{"kube-scheduler", "Kubernetes Scheduler"},
+			{"kube-proxy", "Kubernetes Network Proxy"},
+			{"pause", "Kubernetes pause container for Pod sandbox"},
+			{"etcd", "Highly-available key value store for Kubernetes"},
+			{"coredns/coredns", "CoreDNS is a flexible DNS server"},
+			{"metrics-server/metrics-server", "Kubernetes Metrics Server"},
+			{"ingress-nginx/controller", "NGINX Ingress Controller for Kubernetes"},
+			{"sig-storage/csi-provisioner", "Kubernetes CSI Provisioner"},
+			{"sig-storage/csi-node-driver-registrar", "Kubernetes CSI Node Driver Registrar"},
+		},
+		"nvcr.io": {
+			{"nvidia/cuda", "NVIDIA CUDA runtime and development container"},
+			{"nvidia/pytorch", "NVIDIA PyTorch optimized deep learning container"},
+			{"nvidia/tensorflow", "NVIDIA TensorFlow deep learning container"},
+			{"nvidia/tensorrt", "NVIDIA TensorRT inference accelerator container"},
+			{"nvidia/tritonserver", "NVIDIA Triton Inference Server"},
+			{"nvidia/k8s-device-plugin", "NVIDIA Device Plugin for Kubernetes"},
+			{"nvidia/driver", "NVIDIA GPU driver container"},
+		},
+		"docker.elastic.co": {
+			{"elasticsearch/elasticsearch", "Elasticsearch distributed search and analytics engine"},
+			{"kibana/kibana", "Kibana exploration and visualization dashboard"},
+			{"logstash/logstash", "Logstash server-side data processing pipeline"},
+			{"beats/filebeat", "Filebeat lightweight shipper for logs"},
+			{"beats/metricbeat", "Metricbeat lightweight shipper for metrics"},
+			{"apm/apm-server", "Elastic APM Server"},
+			{"enterprise-search/enterprise-search", "Elastic Enterprise Search"},
+		},
+	}
+
+	list := catalogMap[registry]
+	lowerQ := strings.ToLower(query)
+
+	var matched []Repository
+	for _, it := range list {
+		if strings.Contains(strings.ToLower(it.Name), lowerQ) || strings.Contains(strings.ToLower(it.Desc), lowerQ) {
+			matched = append(matched, Repository{
+				Name:        registry + "/" + it.Name,
+				Description: it.Desc,
+				StarCount:   100,
+				IsOfficial:  true,
+			})
+		}
+	}
+
+	// 如果没有完全精确匹配，但用户输入了明确名字，允许直接返回构造项目
+	if len(matched) == 0 && query != "" {
+		matched = append(matched, Repository{
+			Name:        registry + "/" + query,
+			Description: fmt.Sprintf("%s 镜像: %s", registry, query),
+			StarCount:   0,
+			IsOfficial:  false,
+		})
+	}
+
+	return &SearchResult{
+		Count:   len(matched),
+		Results: matched,
+	}, nil
+}
+
 // searchQuay 搜索 Quay.io 镜像
 func searchQuay(ctx context.Context, query string, page, pageSize int) (*SearchResult, error) {
 	url := fmt.Sprintf("https://quay.io/api/v1/find/repositories?query=%s", url.QueryEscape(query))
@@ -581,6 +674,16 @@ func RegisterSearchRoute(r *gin.Engine) {
 
 		if registry == "ghcr.io" {
 			result, err := searchGHCR(c.Request.Context(), query, page, pageSize)
+			if err != nil {
+				sendErrorResponse(c, err.Error())
+				return
+			}
+			c.JSON(http.StatusOK, result)
+			return
+		}
+
+		if registry == "mcr.microsoft.com" || registry == "gcr.io" || registry == "registry.k8s.io" || registry == "nvcr.io" || registry == "docker.elastic.co" {
+			result, err := searchCatalogRegistry(c.Request.Context(), registry, query, page, pageSize)
 			if err != nil {
 				sendErrorResponse(c, err.Error())
 				return

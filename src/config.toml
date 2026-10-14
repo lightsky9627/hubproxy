@@ -77,6 +77,27 @@ authHost = "registry.k8s.io"
 authType = "anonymous"
 enabled = true
 
+# Microsoft Container Registry
+[registries."mcr.microsoft.com"]
+upstream = "mcr.microsoft.com"
+authHost = "mcr.microsoft.com"
+authType = "anonymous"
+enabled = true
+
+# NVIDIA NGC Registry
+[registries."nvcr.io"]
+upstream = "nvcr.io"
+authHost = "nvcr.io"
+authType = "anonymous"
+enabled = true
+
+# Elastic Container Registry
+[registries."docker.elastic.co"]
+upstream = "docker.elastic.co"
+authHost = "docker.elastic.co"
+authType = "anonymous"
+enabled = true
+
 [tokenCache]
 # 是否启用缓存(同时控制Token和Manifest缓存)显著提升性能
 enabled = true
