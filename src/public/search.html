@@ -224,10 +224,11 @@
         document.getElementById('searchResultSummary').textContent = `共找到 ${data.count || data.results.length} 个结果`;
 
         document.getElementById('repoList').innerHTML = data.results.map((item, idx) => {
-          const isOfficial = item.is_official;
+          const isOfficial = !!item.is_official;
           const stars = item.star_count || 0;
-          const desc = item.description || '暂无详细描述';
-          let rawName = (item.name || '').trim();
+          const desc = item.short_description || item.description || '暂无详细描述';
+          // 兼容后端返回的 repo_name 或 name
+          let rawName = (item.repo_name || item.name || '').trim();
 
           // 严格防止空镜像名
           if (!rawName || rawName === registry || rawName === registry + '/') {
