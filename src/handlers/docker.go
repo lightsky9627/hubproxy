@@ -314,7 +314,10 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		if !allowAnonymous {
 			target, _ := resolveRegistryTarget(c, strings.TrimPrefix(path, "/v2/"))
 			baseURL := publicBaseURL(c)
-			c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s/token/%s",service="%s",error="unauthorized"`, baseURL, target.Name, target.AuthService))
+			// 注意：service 必须设置为当前请求的 Host (例如 hub.bravexist.cn)，
+			// 否则 Docker 客户端在检查 ~/.docker/config.json 发现 service 与登录域名不一致时，会拒绝携带 Basic Auth 凭据
+			challengeService := c.Request.Host
+			c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s/token/%s",service="%s",error="unauthorized"`, baseURL, target.Name, challengeService))
 			c.Header("Docker-Distribution-API-Version", "registry/2.0")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"errors": []gin.H{
