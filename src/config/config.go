@@ -132,7 +132,7 @@ func DefaultConfig() *AppConfig {
 			},
 			"registry.k8s.io": {
 				Upstream: "registry.k8s.io",
-				AuthHost: "registry.k8s.io",
+				AuthHost: "registry.k8s.io/token",
 				AuthType: "anonymous",
 				Enabled:  true,
 			},
@@ -144,13 +144,13 @@ func DefaultConfig() *AppConfig {
 			},
 			"nvcr.io": {
 				Upstream: "nvcr.io",
-				AuthHost: "nvcr.io",
+				AuthHost: "nvcr.io/proxy_auth",
 				AuthType: "anonymous",
 				Enabled:  true,
 			},
 			"docker.elastic.co": {
 				Upstream: "docker.elastic.co",
-				AuthHost: "docker.elastic.co",
+				AuthHost: "docker-auth.elastic.co/auth",
 				AuthType: "anonymous",
 				Enabled:  true,
 			},

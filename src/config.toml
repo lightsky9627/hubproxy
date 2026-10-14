@@ -73,7 +73,7 @@ enabled = true
 # Kubernetes Container Registry
 [registries."registry.k8s.io"]
 upstream = "registry.k8s.io"
-authHost = "registry.k8s.io"
+authHost = "registry.k8s.io/token"
 authType = "anonymous"
 enabled = true
 
@@ -87,14 +87,14 @@ enabled = true
 # NVIDIA NGC Registry
 [registries."nvcr.io"]
 upstream = "nvcr.io"
-authHost = "nvcr.io"
+authHost = "nvcr.io/proxy_auth"
 authType = "anonymous"
 enabled = true
 
 # Elastic Container Registry
 [registries."docker.elastic.co"]
 upstream = "docker.elastic.co"
-authHost = "docker.elastic.co"
+authHost = "docker-auth.elastic.co/auth"
 authType = "anonymous"
 enabled = true
 

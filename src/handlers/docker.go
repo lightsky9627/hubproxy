@@ -104,6 +104,11 @@ func registryTargetFromMapping(name string, mapping config.RegistryMapping) regi
 	}
 
 	authService := strings.TrimPrefix(strings.TrimPrefix(upstream, "https://"), "http://")
+	if name == "nvcr.io" {
+		authService = "registry"
+	} else if name == "docker.elastic.co" {
+		authService = "token-service"
+	}
 
 	return registryTarget{
 		Name:              name,
