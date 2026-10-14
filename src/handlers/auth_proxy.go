@@ -264,7 +264,8 @@ func proxyAuthToUpstream(c *gin.Context, target registryTarget) {
 
 	resp, err := utils.GetGlobalHTTPClient().Do(req)
 	if err != nil {
-		c.String(http.StatusBadGateway, "Auth request failed")
+		fmt.Printf("Auth request to %s failed: %v\n", authURL, err)
+		c.String(http.StatusBadGateway, "Auth request failed: "+err.Error())
 		return
 	}
 	defer resp.Body.Close()

@@ -24,6 +24,10 @@ func InitHTTPClients() {
 	}
 
 	globalHTTPClient = &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// 禁止默认自动跟随重定向，由 HubProxy 代理层捕获并控制流式转发
+			return http.ErrUseLastResponse
+		},
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -58,10 +62,16 @@ func InitHTTPClients() {
 
 // GetGlobalHTTPClient 获取全局HTTP客户端
 func GetGlobalHTTPClient() *http.Client {
+	if globalHTTPClient == nil {
+		InitHTTPClients()
+	}
 	return globalHTTPClient
 }
 
 // GetSearchHTTPClient 获取搜索HTTP客户端
 func GetSearchHTTPClient() *http.Client {
+	if searchHTTPClient == nil {
+		InitHTTPClients()
+	}
 	return searchHTTPClient
 }

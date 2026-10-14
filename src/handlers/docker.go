@@ -23,6 +23,7 @@ type registryTarget struct {
 	Upstream          string
 	AuthRealm         string
 	AuthService       string
+	AuthType          string
 	AutoLibraryPrefix bool
 }
 
@@ -115,6 +116,7 @@ func registryTargetFromMapping(name string, mapping config.RegistryMapping) regi
 		Upstream:          upstream,
 		AuthRealm:         authRealm,
 		AuthService:       authService,
+		AuthType:          mapping.AuthType,
 		AutoLibraryPrefix: false,
 	}
 }
@@ -523,54 +525,62 @@ func proxyRegistryHTTP(c *gin.Context, target registryTarget, upstreamPath strin
 	forwardSelectedRequestHeaders(req.Header, c.Request.Header)
 
 	// 如果客户端携带的是本站自建 JWT Token，需要将其转换为官方或上游 Token 传给上游 registry
+	// 如果客户端未携带 Authorization（例如专属二级域名免登直拉，或公开匿名直拉），则自动向上游申请并注入 Token
 	authHeader := c.GetHeader("Authorization")
+	scope := "repository:" + strings.TrimPrefix(upstreamPath, "/v2/")
+	if idx := strings.Index(scope, "/manifests/"); idx != -1 {
+		scope = scope[:idx] + ":pull"
+	} else if idx := strings.Index(scope, "/blobs/"); idx != -1 {
+		scope = scope[:idx] + ":pull"
+	}
+
+	needsInjectUpstreamToken := false
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		if claims, err := ParseLocalToken(tokenStr); err == nil {
-			// 本地有效用户！检查是否有该 Registry 的服务端账号
-			req.Header.Del("Authorization") // 先移除本地 JWT
-			scope := "repository:" + strings.TrimPrefix(upstreamPath, "/v2/")
-			if idx := strings.Index(scope, "/manifests/"); idx != -1 {
-				scope = scope[:idx] + ":pull"
-			} else if idx := strings.Index(scope, "/blobs/"); idx != -1 {
-				scope = scope[:idx] + ":pull"
-			}
+			req.Header.Del("Authorization") // 移除本站自建 JWT
+			needsInjectUpstreamToken = true
+			_ = claims
+		}
+	} else if authHeader == "" && target.AuthRealm != "" {
+		// 客户端未携带 Authorization（专属二级域名直拉或匿名模式），自动代理上游鉴权
+		needsInjectUpstreamToken = true
+	}
 
-			if upstreamCred, err := db.GetActiveUpstreamCredential(target.Name); err == nil && upstreamCred != nil {
-				upstreamToken, err := fetchUpstreamTokenWithCred(target, scope, upstreamCred.Username, upstreamCred.Password)
-				if err == nil && upstreamToken != "" {
-					var tokStruct struct {
-						Token       string `json:"token"`
-						AccessToken string `json:"access_token"`
-					}
-					_ = json.Unmarshal([]byte(upstreamToken), &tokStruct)
-					finalTok := tokStruct.Token
-					if finalTok == "" {
-						finalTok = tokStruct.AccessToken
-					}
-					if finalTok != "" {
-						req.Header.Set("Authorization", "Bearer "+finalTok)
-					}
+	if needsInjectUpstreamToken {
+		if upstreamCred, err := db.GetActiveUpstreamCredential(target.Name); err == nil && upstreamCred != nil {
+			upstreamToken, err := fetchUpstreamTokenWithCred(target, scope, upstreamCred.Username, upstreamCred.Password)
+			if err == nil && upstreamToken != "" {
+				var tokStruct struct {
+					Token       string `json:"token"`
+					AccessToken string `json:"access_token"`
 				}
-			} else {
-				// 如果服务端没有配置专门的 upstreamCred，以匿名身份向上游 registry 换取临时上游 token
-				anonToken, err := fetchUpstreamTokenWithCred(target, scope, "", "")
-				if err == nil && anonToken != "" {
-					var tokStruct struct {
-						Token       string `json:"token"`
-						AccessToken string `json:"access_token"`
-					}
-					_ = json.Unmarshal([]byte(anonToken), &tokStruct)
-					finalTok := tokStruct.Token
-					if finalTok == "" {
-						finalTok = tokStruct.AccessToken
-					}
-					if finalTok != "" {
-						req.Header.Set("Authorization", "Bearer "+finalTok)
-					}
+				_ = json.Unmarshal([]byte(upstreamToken), &tokStruct)
+				finalTok := tokStruct.Token
+				if finalTok == "" {
+					finalTok = tokStruct.AccessToken
+				}
+				if finalTok != "" {
+					req.Header.Set("Authorization", "Bearer "+finalTok)
 				}
 			}
-			_ = claims // used
+		} else {
+			// 如果服务端没有配置专门的 upstreamCred，以匿名身份向上游 registry 换取临时上游 token
+			anonToken, err := fetchUpstreamTokenWithCred(target, scope, "", "")
+			if err == nil && anonToken != "" {
+				var tokStruct struct {
+					Token       string `json:"token"`
+					AccessToken string `json:"access_token"`
+				}
+				_ = json.Unmarshal([]byte(anonToken), &tokStruct)
+				finalTok := tokStruct.Token
+				if finalTok == "" {
+					finalTok = tokStruct.AccessToken
+				}
+				if finalTok != "" {
+					req.Header.Set("Authorization", "Bearer "+finalTok)
+				}
+			}
 		}
 	}
 
