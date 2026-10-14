@@ -68,6 +68,9 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 		router.GET("/search.html", func(c *gin.Context) {
 			serveEmbedFile(c, "public/search.html")
 		})
+		router.GET("/r/*path", func(c *gin.Context) {
+			serveEmbedFile(c, "public/search.html")
+		})
 		
 		// 动态管理后台路径 (由配置 server.adminPath 控制，默认 /admin，可设自定义路径或空)
 		adminPath := cfg.Server.AdminPath

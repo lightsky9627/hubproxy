@@ -7,6 +7,7 @@
   <link rel="icon" href="/favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -30,6 +31,102 @@
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 9999px; }
     .dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; }
+    /* Markdown 预览样式 */
+    .markdown-body {
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: #334155;
+    }
+    .dark .markdown-body {
+      color: #cbd5e1;
+    }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      font-weight: 700;
+      margin-top: 1.25em;
+      margin-bottom: 0.6em;
+      color: #0f172a;
+    }
+    .dark .markdown-body h1, .dark .markdown-body h2, .dark .markdown-body h3 {
+      color: #f8fafc;
+    }
+    .markdown-body h1 { font-size: 1.5em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }
+    .dark .markdown-body h1 { border-bottom-color: #334155; }
+    .markdown-body h2 { font-size: 1.25em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }
+    .dark .markdown-body h2 { border-bottom-color: #334155; }
+    .markdown-body h3 { font-size: 1.1em; }
+    .markdown-body p, .markdown-body ul, .markdown-body ol {
+      margin-bottom: 0.85em;
+    }
+    .markdown-body ul { list-style-type: disc; padding-left: 1.5em; }
+    .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; }
+    .markdown-body li { margin-bottom: 0.25em; }
+    .markdown-body code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      padding: 0.15em 0.35em;
+      border-radius: 4px;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    .dark .markdown-body code {
+      background-color: #1e293b;
+      color: #e2e8f0;
+    }
+    .markdown-body pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-bottom: 1em;
+    }
+    .dark .markdown-body pre {
+      background-color: #020617;
+      border: 1px solid #1e293b;
+    }
+    .markdown-body pre code {
+      background-color: transparent !important;
+      color: inherit !important;
+      padding: 0;
+    }
+    .markdown-body a {
+      color: #2563eb;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .dark .markdown-body a {
+      color: #60a5fa;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1em;
+      font-size: 12.5px;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid #e2e8f0;
+      padding: 6px 10px;
+    }
+    .dark .markdown-body th, .dark .markdown-body td {
+      border-color: #334155;
+    }
+    .markdown-body th {
+      background-color: #f8fafc;
+      font-weight: 600;
+    }
+    .dark .markdown-body th {
+      background-color: #1e293b;
+    }
+    .markdown-body blockquote {
+      border-left: 4px solid #cbd5e1;
+      padding-left: 12px;
+      color: #64748b;
+      margin-bottom: 0.85em;
+    }
+    .dark .markdown-body blockquote {
+      border-left-color: #475569;
+      color: #94a3b8;
+    }
   </style>
 </head>
 <body class="bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col antialiased transition-colors duration-200">
@@ -37,7 +134,7 @@
   <!-- Topbar -->
   <header class="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30 select-none shadow-sm">
     <div class="flex items-center space-x-6">
-      <a href="/" class="flex items-center space-x-2.5">
+      <a href="/" onclick="navigateToHome(event)" class="flex items-center space-x-2.5">
         <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-blue-500/30">
           <i data-lucide="layers" class="w-5 h-5"></i>
         </div>
@@ -48,7 +145,7 @@
       </a>
 
       <nav class="hidden sm:flex items-center space-x-1 text-sm font-medium text-slate-600 dark:text-slate-300">
-        <a href="/" class="px-3 py-1.5 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/40">镜像检索</a>
+        <a href="/" onclick="navigateToHome(event)" class="px-3 py-1.5 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/40 cursor-pointer">镜像检索</a>
       </nav>
     </div>
 
@@ -64,9 +161,8 @@
     </div>
   </header>
 
-  <!-- Main Container (复刻 1ms.run 搜索风格) -->
-  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-8 space-y-6">
-    
+  <!-- Search View (搜索视图) -->
+  <main id="searchView" class="flex-1 max-w-4xl w-full mx-auto px-4 py-8 space-y-6">
     <!-- 头部搜索框组合 (源仓库选择 + 关键词输入 + 搜索按钮) -->
     <div class="space-y-3">
       <form id="searchForm" onsubmit="handleSearch(event)" class="flex shadow-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/50 focus-within:border-blue-500 transition-all">
@@ -95,7 +191,7 @@
       </form>
 
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <span>支持官方 Docker Hub 及 Quay 仓库开源镜像直接检索与一键加速拉取</span>
+        <span>支持官方 Docker Hub 及 Quay 等开源镜像直接检索、标签查看与一键加速拉取</span>
         <span id="searchResultSummary"></span>
       </div>
     </div>
@@ -108,7 +204,7 @@
           <i data-lucide="compass" class="w-7 h-7"></i>
         </div>
         <h3 class="font-bold text-base text-slate-700 dark:text-slate-200">全网容器镜像快速检索</h3>
-        <p class="text-xs text-slate-400 max-w-sm mx-auto">输入关键词即可检索上游 Docker Hub、Quay 及 GHCR 镜像，点击直接获取加速拉取命令。</p>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto">输入关键词即可检索上游 Docker Hub、Quay 及 GHCR 镜像，点击卡片直接进入详情与 Tag 查看。</p>
       </div>
 
       <!-- Loading -->
@@ -120,7 +216,122 @@
       <!-- 搜索结果列表容器 -->
       <div id="repoList" class="space-y-3"></div>
     </div>
+  </main>
 
+  <!-- Repository Detail View (1ms.run 风格 /r 详情视图) -->
+  <main id="detailView" class="hidden flex-1 max-w-5xl w-full mx-auto px-4 py-6 space-y-5">
+    <!-- 面包屑导航 -->
+    <nav class="flex items-center text-xs text-slate-500 dark:text-slate-400 space-x-2">
+      <a href="/" onclick="navigateToHome(event)" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">首页</a>
+      <span class="text-slate-300 dark:text-slate-600">/</span>
+      <span id="detailBreadcrumb" class="text-slate-700 dark:text-slate-300 font-medium"></span>
+    </nav>
+
+    <!-- 镜像头部信息卡片 (Header Card) -->
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-6 relative shadow-sm">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-start sm:items-center space-x-4">
+          <img id="detailLogo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.12 6.4-6.05-4.06a2 2 0 0 0-2.17-.05L2.95 8.41a2 2 0 0 0-.95 1.7v5.82a2 2 0 0 0 .88 1.66l6.05 4.07a2 2 0 0 0 2.17.05l9.95-6.12a2 2 0 0 0 .95-1.7V8.06a2 2 0 0 0-.88-1.66Z'%3E%3C/path%3E%3Cpath d='m10 22v-8L2 9'%3E%3C/path%3E%3Cpath d='M10 14 22 7'%3E%3C/path%3E%3C/svg%3E" alt="logo" class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/60 p-2 shrink-0">
+          <div class="space-y-1.5">
+            <div class="flex items-center space-x-2 flex-wrap">
+              <h1 id="detailTitle" class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white"></h1>
+              <span id="detailOfficialBadge" class="hidden px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">
+                Docker 官方镜像
+              </span>
+              <span id="detailRegistryBadge" class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"></span>
+            </div>
+            <div class="flex items-center space-x-3 text-xs text-slate-400">
+              <span id="detailLastUpdated">上游更新：暂无记录</span>
+              <span>•</span>
+              <span id="detailSyncedAt">数据同步：已连接</span>
+            </div>
+            <p id="detailDesc" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl"></p>
+          </div>
+        </div>
+
+        <!-- 统计指标 (下载量与标星) -->
+        <div class="flex items-center space-x-4 sm:flex-col sm:items-end sm:space-x-0 sm:space-y-1.5 text-xs text-slate-500 dark:text-slate-400 shrink-0">
+          <div class="flex items-center space-x-1.5">
+            <i data-lucide="download" class="w-3.5 h-3.5 text-blue-500"></i>
+            <span id="detailPullCount">0</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500 fill-current"></i>
+            <span id="detailStarCount">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 拉取模式快捷工具栏 (Pull Command Toolbar) -->
+      <div class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-800/40 -mx-5 -mb-5 sm:-mx-6 sm:-mb-6 p-4 sm:px-6 rounded-b-xl">
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">拉取方式:</span>
+          <div class="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 text-xs font-medium">
+            <button id="modePublicBtn" onclick="switchPullMode('public')" class="px-2.5 py-1 rounded-md bg-blue-600 text-white transition">公共加速</button>
+            <button id="modeSubdomainBtn" onclick="switchPullMode('subdomain')" class="px-2.5 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 transition">专属域名</button>
+            <button id="modeOriginalBtn" onclick="switchPullMode('original')" class="px-2.5 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 transition">原始地址</button>
+          </div>
+        </div>
+
+        <div class="flex-1 max-w-xl flex items-center space-x-2">
+          <div id="detailPullCmdBox" class="flex-1 font-mono text-[11px] bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 select-all truncate">
+          </div>
+          <button id="detailCopyBtn" onclick="copyDetailCommand()" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center space-x-1.5 transition shrink-0">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>复制</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签页切换卡片 (简介 Overview / 标签列表 Tags) -->
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+      <div class="border-b border-slate-200 dark:border-slate-800 flex items-center px-4 sm:px-6 space-x-6">
+        <button id="tabOverviewBtn" onclick="switchTab('overview')" class="py-3.5 text-sm font-semibold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 transition flex items-center space-x-1.5">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>简介</span>
+        </button>
+        <button id="tabTagsBtn" onclick="switchTab('tags')" class="py-3.5 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition flex items-center space-x-1.5">
+          <i data-lucide="tags" class="w-4 h-4"></i>
+          <span>标签列表</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: 简介内容 (Overview Markdown) -->
+      <div id="tabOverviewContent" class="p-5 sm:p-7">
+        <div id="overviewMarkdown" class="markdown-body"></div>
+      </div>
+
+      <!-- Tab 2: 标签列表 (Tags Table / Cards) -->
+      <div id="tabTagsContent" class="hidden p-5 sm:p-6 space-y-4">
+        <!-- 标签搜索与过滤栏 -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="relative w-full sm:w-72">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+            <input type="text" id="tagSearchInput" oninput="filterTagsLocally()" placeholder="在当前页搜索 Tag..." class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500 text-slate-800 dark:text-slate-100">
+          </div>
+          <div class="text-xs text-slate-400">
+            共 <span id="tagsTotalCount" class="font-semibold text-slate-700 dark:text-slate-200">0</span> 个标签版本
+          </div>
+        </div>
+
+        <!-- 标签加载状态 -->
+        <div id="tagsLoadingBox" class="text-center py-12 space-y-2">
+          <div class="inline-block animate-spin rounded-full h-7 w-7 border-2 border-blue-600 border-t-transparent"></div>
+          <div class="text-xs text-slate-400">正在获取镜像标签列表...</div>
+        </div>
+
+        <!-- 标签列表展示容器 -->
+        <div id="tagsContainer" class="space-y-3"></div>
+
+        <!-- 分页控件 -->
+        <div id="tagsPagination" class="hidden flex items-center justify-center space-x-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <button id="prevPageBtn" onclick="changeTagsPage(-1)" class="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+          <span id="pageIndicator" class="text-xs text-slate-500 font-mono">1 / 1</span>
+          <button id="nextPageBtn" onclick="changeTagsPage(1)" class="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- 普通用户客户端指南/登录弹窗 -->
@@ -179,15 +390,384 @@
 
     const host = window.location.host;
 
-    // 解析 URL 参数初始化
-    const urlParams = new URLSearchParams(window.location.search);
-    const initialQuery = urlParams.get('query') || urlParams.get('q') || '';
-    const initialReg = urlParams.get('registry') || 'docker.io';
+    // 全局当前镜像状态
+    let currentDetail = {
+      registry: 'docker.io',
+      repository: '',
+      displayImage: '',
+      pullMode: 'public',
+      tagsPage: 1,
+      tagsPageSize: 10,
+      tagsTotal: 0,
+      tagsList: []
+    };
 
-    if (initialQuery) {
-      document.getElementById('searchInput').value = initialQuery;
-      document.getElementById('registrySelect').value = initialReg;
-      executeSearch(initialQuery, initialReg);
+    // 格式化数字 (如 134.5亿, 2.1万)
+    function formatCount(num) {
+      if (!num || isNaN(num)) return '0';
+      if (num >= 100000000) {
+        return (num / 100000000).toFixed(1) + '亿';
+      }
+      if (num >= 10000) {
+        return (num / 10000).toFixed(1) + '万';
+      }
+      return num.toLocaleString();
+    }
+
+    // 格式化字节大小
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // 相对时间格式化
+    function timeAgo(dateString) {
+      if (!dateString) return '暂无记录';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      const seconds = Math.floor((new Date() - date) / 1000);
+      if (seconds < 60) return '刚刚';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}分钟前`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}小时前`;
+      const days = Math.floor(hours / 24);
+      if (days < 30) return `${days}天前`;
+      const months = Math.floor(days / 30);
+      if (months < 12) return `${months}个月前`;
+      return `${Math.floor(days / 365)}年前`;
+    }
+
+    // 路由分发器
+    function handleRouting() {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/r/')) {
+        // 详情页路由: /r/:registry/:repo 或 /r/:repo
+        const rawPath = pathname.substring(3);
+        let reg = 'docker.io';
+        let repo = rawPath;
+
+        const knownRegistries = ['docker.io', 'ghcr.io', 'gcr.io', 'registry.k8s.io', 'quay.io', 'mcr.microsoft.com', 'nvcr.io', 'docker.elastic.co'];
+        for (const kr of knownRegistries) {
+          if (rawPath === kr || rawPath.startsWith(kr + '/')) {
+            reg = kr;
+            repo = rawPath.substring(kr.length + 1);
+            break;
+          }
+        }
+        showDetailView(reg, repo);
+      } else {
+        showSearchView();
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('query') || urlParams.get('q') || '';
+        const reg = urlParams.get('registry') || 'docker.io';
+        if (query) {
+          document.getElementById('searchInput').value = query;
+          document.getElementById('registrySelect').value = reg;
+          executeSearch(query, reg);
+        }
+      }
+    }
+
+    function navigateToHome(e) {
+      if (e) e.preventDefault();
+      window.history.pushState({}, '', '/');
+      handleRouting();
+    }
+
+    function openRepositoryDetail(reg, repo) {
+      let routePath = `/r/${repo}`;
+      if (reg !== 'docker.io') {
+        routePath = `/r/${reg}/${repo}`;
+      }
+      window.history.pushState({}, '', routePath);
+      showDetailView(reg, repo);
+    }
+
+    function showSearchView() {
+      document.getElementById('searchView').classList.remove('hidden');
+      document.getElementById('detailView').classList.add('hidden');
+    }
+
+    function showDetailView(registry, repository) {
+      document.getElementById('searchView').classList.add('hidden');
+      document.getElementById('detailView').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // 标准化 repo
+      let cleanRepo = repository;
+      if ((registry === 'docker.io' || registry === 'registry-1.docker.io') && !cleanRepo.includes('/')) {
+        cleanRepo = 'library/' + cleanRepo;
+      }
+
+      let displayImage = cleanRepo;
+      if (registry !== 'docker.io') {
+        displayImage = `${registry}/${cleanRepo}`;
+      }
+
+      currentDetail.registry = registry;
+      currentDetail.repository = cleanRepo;
+      currentDetail.displayImage = displayImage;
+      currentDetail.tagsPage = 1;
+
+      // 渲染初始框架
+      document.getElementById('detailBreadcrumb').textContent = displayImage;
+      document.getElementById('detailTitle').textContent = displayImage;
+      document.getElementById('detailRegistryBadge').textContent = registry;
+      document.getElementById('detailDesc').textContent = '正在获取镜像详细介绍与标签元数据...';
+      document.getElementById('detailPullCount').textContent = '...';
+      document.getElementById('detailStarCount').textContent = '...';
+      document.getElementById('detailLastUpdated').textContent = '上游更新：加载中...';
+      document.getElementById('detailSyncedAt').textContent = '数据同步：已连接';
+      document.getElementById('overviewMarkdown').innerHTML = '<div class="py-12 text-center text-slate-400 text-xs">正在渲染镜像文档...</div>';
+
+      updateDetailPullCommand();
+
+      // 请求详情数据
+      loadDetailData(registry, cleanRepo);
+      // 请求 Tags 数据
+      loadTagsData(registry, cleanRepo, 1);
+    }
+
+    async function loadDetailData(registry, repository) {
+      try {
+        const res = await fetch(`/api/v1/registry/get_detail?repositories=${encodeURIComponent(repository)}&registry=${encodeURIComponent(registry)}`);
+        const json = await res.json();
+        if (json.code === 0 && json.data) {
+          const d = json.data;
+          document.getElementById('detailDesc').textContent = d.description || '暂无描述';
+          document.getElementById('detailPullCount').textContent = formatCount(d.pull_count);
+          document.getElementById('detailStarCount').textContent = formatCount(d.star_count);
+          document.getElementById('detailLastUpdated').textContent = `上游更新：${timeAgo(d.last_updated || d.last_modified)}`;
+
+          if (d.is_official) {
+            document.getElementById('detailOfficialBadge').classList.remove('hidden');
+          } else {
+            document.getElementById('detailOfficialBadge').classList.add('hidden');
+          }
+
+          if (d.logo_url) {
+            document.getElementById('detailLogo').src = d.logo_url;
+          }
+
+          // 渲染 Markdown 文档
+          if (d.full_description) {
+            document.getElementById('overviewMarkdown').innerHTML = marked.parse(d.full_description);
+          } else {
+            document.getElementById('overviewMarkdown').innerHTML = `
+              <div class="py-12 text-center text-slate-400 space-y-2">
+                <p class="text-sm font-medium">该镜像上游未提供额外 Markdown 描述文档</p>
+                <p class="text-xs">您可以切换上方【标签列表】查看具体的架构版本与拉取命令。</p>
+              </div>`;
+          }
+        }
+      } catch (err) {
+        document.getElementById('detailDesc').textContent = '获取详细描述异常，但不影响直接拉取使用。';
+      }
+    }
+
+    async function loadTagsData(registry, repository, page) {
+      document.getElementById('tagsLoadingBox').classList.remove('hidden');
+      document.getElementById('tagsContainer').innerHTML = '';
+      document.getElementById('tagsPagination').classList.add('hidden');
+
+      try {
+        const res = await fetch(`/api/v1/registry/get_tags?repositories=${encodeURIComponent(repository)}&registry=${encodeURIComponent(registry)}&page=${page}&page_size=10`);
+        const json = await res.json();
+        document.getElementById('tagsLoadingBox').classList.add('hidden');
+
+        if (json.code === 0 && json.data) {
+          const list = json.data.list || [];
+          currentDetail.tagsList = list;
+          currentDetail.tagsTotal = json.data.total || list.length;
+          currentDetail.tagsPage = json.data.page || page;
+          document.getElementById('tagsTotalCount').textContent = currentDetail.tagsTotal;
+
+          renderTagsList(list);
+
+          // 分页控制器
+          const totalPages = Math.ceil(currentDetail.tagsTotal / 10);
+          if (totalPages > 1) {
+            document.getElementById('tagsPagination').classList.remove('hidden');
+            document.getElementById('pageIndicator').textContent = `${currentDetail.tagsPage} / ${totalPages}`;
+            document.getElementById('prevPageBtn').disabled = currentDetail.tagsPage <= 1;
+            document.getElementById('nextPageBtn').disabled = currentDetail.tagsPage >= totalPages;
+          }
+        } else {
+          renderTagsFallback();
+        }
+      } catch (err) {
+        document.getElementById('tagsLoadingBox').classList.add('hidden');
+        renderTagsFallback();
+      }
+    }
+
+    function renderTagsFallback() {
+      document.getElementById('tagsContainer').innerHTML = `
+        <div class="text-center py-10 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+          <p class="text-xs text-slate-500">上游暂无分段标签清单或正在同步，推荐直接使用 <code>:latest</code> 标签拉取。</p>
+          <div class="text-[11px] font-mono text-slate-600 dark:text-slate-300">
+            docker pull ${host}/${currentDetail.displayImage}:latest
+          </div>
+        </div>`;
+    }
+
+    function renderTagsList(list) {
+      if (!list || list.length === 0) {
+        document.getElementById('tagsContainer').innerHTML = `
+          <div class="text-center py-12 text-slate-400 text-xs">
+            暂无匹配的 Tag
+          </div>`;
+        return;
+      }
+
+      document.getElementById('tagsContainer').innerHTML = list.map((tag, idx) => {
+        const tagName = tag.tag_name || tag.name || 'latest';
+        const updated = timeAgo(tag.last_updated || tag.tag_last_pushed);
+        const images = tag.images || [];
+        const fullSize = tag.full_size ? formatBytes(tag.full_size) : '';
+
+        // 拉取当前 tag 命令
+        let tagPullCmd = `docker pull ${host}/${currentDetail.displayImage}:${tagName}`;
+        if (currentDetail.pullMode === 'subdomain') {
+          tagPullCmd = `docker pull <username>.hub.bravexist.cn/${currentDetail.repository}:${tagName}`;
+        } else if (currentDetail.pullMode === 'original') {
+          tagPullCmd = `docker pull ${currentDetail.registry === 'docker.io' ? '' : currentDetail.registry + '/'}${currentDetail.repository}:${tagName}`;
+        }
+
+        const tagBtnId = `tag-copy-btn-${idx}`;
+
+        let archRows = '';
+        if (images && images.length > 0) {
+          archRows = images.map(img => {
+            const arch = (img.architecture || 'amd64') + (img.variant ? `/${img.variant}` : '');
+            const os = img.os || 'linux';
+            const size = img.size ? formatBytes(img.size) : fullSize || '-';
+            const shortDigest = img.digest ? img.digest.substring(0, 19) + '...' : '-';
+            return `
+              <tr class="border-t border-slate-100 dark:border-slate-800/60 text-slate-600 dark:text-slate-300">
+                <td class="py-1.5 px-3 font-mono font-medium">${os}/${arch}</td>
+                <td class="py-1.5 px-3">${size}</td>
+                <td class="py-1.5 px-3 font-mono text-slate-400 truncate max-w-xs" title="${img.digest || ''}">${shortDigest}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        return `
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 overflow-hidden shadow-xs hover:border-blue-500/50 transition">
+            <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900">
+              <div class="flex items-center space-x-2.5">
+                <span class="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">${tagName}</span>
+                ${fullSize ? `<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">${fullSize}</span>` : ''}
+              </div>
+              <div class="text-xs text-slate-400">更新于 ${updated}</div>
+            </div>
+
+            <div class="p-4 space-y-3">
+              <div class="flex items-center space-x-2">
+                <div class="flex-1 font-mono text-[11px] bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 select-all truncate">
+                  ${tagPullCmd}
+                </div>
+                <button id="${tagBtnId}" onclick="copyCommand('${tagPullCmd}', '${tagBtnId}')" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center space-x-1 transition shrink-0">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  <span>复制</span>
+                </button>
+              </div>
+
+              ${archRows ? `
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs">
+                    <thead>
+                      <tr class="text-slate-400 text-[11px]">
+                        <th class="py-1 px-3">架构平台</th>
+                        <th class="py-1 px-3">镜像大小</th>
+                        <th class="py-1 px-3">摘要 (Digest)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${archRows}
+                    </tbody>
+                  </table>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function filterTagsLocally() {
+      const q = document.getElementById('tagSearchInput').value.trim().toLowerCase();
+      if (!q) {
+        renderTagsList(currentDetail.tagsList);
+        return;
+      }
+      const filtered = currentDetail.tagsList.filter(t => {
+        const name = (t.tag_name || t.name || '').toLowerCase();
+        return name.includes(q);
+      });
+      renderTagsList(filtered);
+    }
+
+    function changeTagsPage(delta) {
+      const newPage = currentDetail.tagsPage + delta;
+      if (newPage < 1) return;
+      loadTagsData(currentDetail.registry, currentDetail.repository, newPage);
+    }
+
+    function switchPullMode(mode) {
+      currentDetail.pullMode = mode;
+      const modes = ['public', 'subdomain', 'original'];
+      modes.forEach(m => {
+        const btn = document.getElementById(`mode${m.charAt(0).toUpperCase() + m.slice(1)}Btn`);
+        if (m === mode) {
+          btn.className = 'px-2.5 py-1 rounded-md bg-blue-600 text-white transition';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 transition';
+        }
+      });
+      updateDetailPullCommand();
+      // 重新渲染当前 tags 的拉取命令
+      renderTagsList(currentDetail.tagsList);
+    }
+
+    function updateDetailPullCommand() {
+      let cmd = `docker pull ${host}/${currentDetail.displayImage}:latest`;
+      if (currentDetail.pullMode === 'subdomain') {
+        cmd = `docker pull <username>.hub.bravexist.cn/${currentDetail.repository}:latest`;
+      } else if (currentDetail.pullMode === 'original') {
+        cmd = `docker pull ${currentDetail.registry === 'docker.io' ? '' : currentDetail.registry + '/'}${currentDetail.repository}:latest`;
+      }
+      document.getElementById('detailPullCmdBox').textContent = cmd;
+    }
+
+    function copyDetailCommand() {
+      const cmd = document.getElementById('detailPullCmdBox').textContent.trim();
+      copyCommand(cmd, 'detailCopyBtn');
+    }
+
+    function switchTab(tab) {
+      const isOverview = tab === 'overview';
+      document.getElementById('tabOverviewContent').classList.toggle('hidden', !isOverview);
+      document.getElementById('tabTagsContent').classList.toggle('hidden', isOverview);
+
+      const ovBtn = document.getElementById('tabOverviewBtn');
+      const tagsBtn = document.getElementById('tabTagsBtn');
+
+      if (isOverview) {
+        ovBtn.className = 'py-3.5 text-sm font-semibold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 transition flex items-center space-x-1.5';
+        tagsBtn.className = 'py-3.5 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition flex items-center space-x-1.5';
+      } else {
+        tagsBtn.className = 'py-3.5 text-sm font-semibold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 transition flex items-center space-x-1.5';
+        ovBtn.className = 'py-3.5 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition flex items-center space-x-1.5';
+      }
+      lucide.createIcons();
     }
 
     function handleSearch(e) {
@@ -196,7 +776,8 @@
       const reg = document.getElementById('registrySelect').value;
       if (!q) return;
 
-      const newUrl = `${window.location.pathname}?query=${encodeURIComponent(q)}&registry=${encodeURIComponent(reg)}`;
+      showSearchView();
+      const newUrl = `/?query=${encodeURIComponent(q)}&registry=${encodeURIComponent(reg)}`;
       window.history.pushState({}, '', newUrl);
       executeSearch(q, reg);
     }
@@ -227,7 +808,6 @@
           const isOfficial = !!item.is_official;
           const stars = item.star_count || 0;
           const desc = item.short_description || item.description || '暂无详细描述';
-          // 兼容后端返回的 repo_name 或 name
           let rawName = (item.repo_name || item.name || '').trim();
 
           // 严格防止空镜像名
@@ -235,7 +815,6 @@
             return '';
           }
 
-          // 如果 rawName 已经包含了 registry 前缀，先去掉以防重复
           if (registry !== 'docker.io' && rawName.startsWith(registry + '/')) {
             rawName = rawName.substring(registry.length + 1);
           }
@@ -249,10 +828,10 @@
           const btnId = `copy-btn-${idx}`;
 
           return `
-            <div class="p-4 sm:p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-500/70 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+            <div class="p-4 sm:p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-500/70 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer" onclick="openRepositoryDetail('${registry}', '${rawName}')">
               <div class="space-y-1.5 flex-1 min-w-0">
                 <div class="flex items-center space-x-2 flex-wrap">
-                  <span class="font-bold text-sm sm:text-base text-slate-800 dark:text-white truncate">${displayImage}</span>
+                  <span class="font-bold text-sm sm:text-base text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition truncate">${displayImage}</span>
                   ${isOfficial ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">官方认证</span>` : ''}
                   <span class="text-xs text-amber-500 flex items-center space-x-0.5">
                     <i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>
@@ -260,17 +839,21 @@
                   </span>
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">${desc}</p>
-                <div class="pt-1 flex items-center space-x-2">
+                <div class="pt-1 flex items-center space-x-2" onclick="event.stopPropagation()">
                   <div class="text-[11px] font-mono bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded border border-slate-200/60 dark:border-slate-700/60 select-all truncate max-w-lg">
                     ${pullCmd}
                   </div>
                 </div>
               </div>
 
-              <div class="flex items-center space-x-2 shrink-0">
+              <div class="flex items-center space-x-2 shrink-0" onclick="event.stopPropagation()">
                 <button id="${btnId}" onclick="copyCommand('${pullCmd}', '${btnId}')" class="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center space-x-1.5 transition">
                   <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                   <span>复制拉取</span>
+                </button>
+                <button onclick="openRepositoryDetail('${registry}', '${rawName}')" class="px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-xs font-medium flex items-center space-x-1 transition">
+                  <span>详情</span>
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
             </div>
@@ -300,7 +883,6 @@
           }, 1500);
         }
       }).catch(() => {
-        // Fallback for older browsers
         const input = document.createElement('input');
         input.value = text;
         document.body.appendChild(input);
@@ -320,8 +902,12 @@
       if (modal) modal.classList.add('hidden');
     }
 
+    // 浏览器前进后退监听
+    window.addEventListener('popstate', handleRouting);
+
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
+      handleRouting();
     });
   </script>
 </body>

@@ -39,6 +39,22 @@ type Repository struct {
 	Namespace     string `json:"namespace"`
 }
 
+// DetailInfo 包含镜像详情
+type DetailInfo struct {
+	Name            string   `json:"name"`
+	Namespace       string   `json:"namespace"`
+	RepositoryName  string   `json:"repository_name"`
+	Description     string   `json:"description"`
+	FullDescription string   `json:"full_description"`
+	LogoURL         string   `json:"logo_url"`
+	PullCount       float64  `json:"pull_count"`
+	StarCount       int      `json:"star_count"`
+	IsOfficial      bool     `json:"is_official"`
+	LastUpdated     string   `json:"last_updated"`
+	Registry        string   `json:"registry"`
+	Categories      []string `json:"categories"`
+}
+
 // TagInfo 标签信息
 type TagInfo struct {
 	Name            string    `json:"name"`
@@ -501,6 +517,126 @@ func isRetryableError(err error) bool {
 	return false
 }
 
+// getRepositoryDetail 获取镜像详情 (元数据与完整文档)
+func getRepositoryDetail(ctx context.Context, registry, repository string) (map[string]interface{}, error) {
+	if registry == "" {
+		registry = "docker.io"
+	}
+	targetRepo := strings.Trim(strings.TrimSpace(repository), "/")
+	if (registry == "docker.io" || registry == "registry-1.docker.io") && !strings.Contains(targetRepo, "/") {
+		targetRepo = "library/" + targetRepo
+	}
+
+	cacheKey := fmt.Sprintf("detail:%s:%s", registry, targetRepo)
+	if cached, ok := searchCache.Get(cacheKey); ok {
+		if res, ok := cached.(map[string]interface{}); ok {
+			return res, nil
+		}
+	}
+
+	u := fmt.Sprintf("https://1ms.run/api/v1/registry/get_detail?repositories=%s&registry=%s", url.QueryEscape(targetRepo), url.QueryEscape(registry))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := utils.GetSearchHTTPClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var res struct {
+		Code int                    `json:"code"`
+		Data map[string]interface{} `json:"data"`
+		Msg  string                 `json:"msg"`
+	}
+	if err := json.Unmarshal(b, &res); err != nil {
+		return nil, err
+	}
+
+	if res.Code == 0 && res.Data != nil && len(res.Data) > 0 {
+		searchCache.SetWithTTL(cacheKey, res.Data, 30*time.Minute)
+		return res.Data, nil
+	}
+
+	// 降级构造基础元数据
+	parts := strings.Split(targetRepo, "/")
+	name := parts[len(parts)-1]
+	fallback := map[string]interface{}{
+		"name":             name,
+		"namespace":        strings.Join(parts[:len(parts)-1], "/"),
+		"repository_name":  targetRepo,
+		"registry":         registry,
+		"description":      fmt.Sprintf("%s 镜像", targetRepo),
+		"full_description": fmt.Sprintf("# %s\n\n镜像仓库: `%s`\n注册中心: `%s`", targetRepo, targetRepo, registry),
+		"is_official":      false,
+		"pull_count":       0,
+		"star_count":       0,
+	}
+	return fallback, nil
+}
+
+// getRepositoryTagsEx 获取镜像 tags 列表 (带分页与详细架构架构信息)
+func getRepositoryTagsEx(ctx context.Context, registry, repository string, page, pageSize int) (map[string]interface{}, error) {
+	if registry == "" {
+		registry = "docker.io"
+	}
+	targetRepo := strings.Trim(strings.TrimSpace(repository), "/")
+	if (registry == "docker.io" || registry == "registry-1.docker.io") && !strings.Contains(targetRepo, "/") {
+		targetRepo = "library/" + targetRepo
+	}
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	cacheKey := fmt.Sprintf("tags_ex:%s:%s:p%d:ps%d", registry, targetRepo, page, pageSize)
+	if cached, ok := searchCache.Get(cacheKey); ok {
+		if res, ok := cached.(map[string]interface{}); ok {
+			return res, nil
+		}
+	}
+
+	u := fmt.Sprintf("https://1ms.run/api/v1/registry/get_tags?repositories=%s&registry=%s&page=%d&page_size=%d",
+		url.QueryEscape(targetRepo), url.QueryEscape(registry), page, pageSize)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := utils.GetSearchHTTPClient().Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+		b, err := io.ReadAll(resp.Body)
+		if err == nil {
+			var res struct {
+				Code int                    `json:"code"`
+				Data map[string]interface{} `json:"data"`
+				Msg  string                 `json:"msg"`
+			}
+			if err := json.Unmarshal(b, &res); err == nil && res.Code == 0 && res.Data != nil {
+				searchCache.SetWithTTL(cacheKey, res.Data, 15*time.Minute)
+				return res.Data, nil
+			}
+		}
+	}
+
+	// 降级返回基础列表
+	return map[string]interface{}{
+		"total":     0,
+		"page":      page,
+		"page_size": pageSize,
+		"list":      []interface{}{},
+	}, nil
+}
+
 // getRepositoryTags 获取仓库标签信息
 func getRepositoryTags(ctx context.Context, namespace, name string, page, pageSize int) ([]TagInfo, bool, error) {
 	if namespace == "" || name == "" {
@@ -689,6 +825,57 @@ func RegisterSearchRoute(r *gin.Engine) {
 		}
 
 		c.JSON(http.StatusOK, result)
+	})
+
+	r.GET("/api/v1/registry/get_detail", func(c *gin.Context) {
+		repo := c.Query("repositories")
+		if repo == "" {
+			repo = c.Query("repository")
+		}
+		if repo == "" {
+			repo = c.Query("repo")
+		}
+		reg := c.Query("registry")
+		if reg == "" {
+			reg = "docker.io"
+		}
+		if repo == "" {
+			sendErrorResponse(c, "仓库路径不能为空")
+			return
+		}
+
+		data, err := getRepositoryDetail(c.Request.Context(), reg, repo)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"code": 1, "msg": err.Error(), "data": nil})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "ok", "data": data})
+	})
+
+	r.GET("/api/v1/registry/get_tags", func(c *gin.Context) {
+		repo := c.Query("repositories")
+		if repo == "" {
+			repo = c.Query("repository")
+		}
+		if repo == "" {
+			repo = c.Query("repo")
+		}
+		reg := c.Query("registry")
+		if reg == "" {
+			reg = "docker.io"
+		}
+		if repo == "" {
+			sendErrorResponse(c, "仓库路径不能为空")
+			return
+		}
+
+		page, pageSize := parsePaginationParams(c, 10)
+		data, err := getRepositoryTagsEx(c.Request.Context(), reg, repo, page, pageSize)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"code": 1, "msg": err.Error(), "data": nil})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "ok", "data": data})
 	})
 
 	r.GET("/tags/:namespace/:name", func(c *gin.Context) {
