@@ -299,12 +299,18 @@
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">拉取日志</h1>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">原汁原味呈现 Docker 客户端的真实拉取请求、状态码与耗时。</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">呈现真实客户端拉取动作、状态码与流量。系统每日自动清理超 30 天日志。</p>
           </div>
-          <button onclick="loadLogs()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-200 hover:bg-slate-50 flex items-center space-x-1 transition">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            <span>刷新</span>
-          </button>
+          <div class="flex items-center space-x-2">
+            <button onclick="cleanOldLogs()" class="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-100 flex items-center space-x-1 transition" title="手动清理30天前旧日志">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>清理旧日志</span>
+            </button>
+            <button onclick="loadLogs()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-200 hover:bg-slate-50 flex items-center space-x-1 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>刷新</span>
+            </button>
+          </div>
         </div>
 
         <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
@@ -925,6 +931,18 @@
         `).join('');
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    async function cleanOldLogs() {
+      if (!confirm('确定清理 30 天以前的历史日志？该操作不可逆。')) return;
+      try {
+        const res = await authFetch('/api/admin/logs/clean?days=30', { method: 'POST' });
+        const data = await res.json();
+        alert(data.message || '清理完成');
+        loadLogs();
+      } catch (e) {
+        alert('清理失败');
       }
     }
 

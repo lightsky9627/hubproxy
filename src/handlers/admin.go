@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -240,6 +241,24 @@ func AdminLogsHandler(c *gin.Context) {
 	})
 }
 
+// 手动清理旧日志
+func AdminCleanLogsHandler(c *gin.Context) {
+	daysStr := c.DefaultQuery("days", "30")
+	days, _ := strconv.Atoi(daysStr)
+	if days <= 0 {
+		days = 30
+	}
+	affected, err := db.CleanOldPullLogs(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "清理失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":  fmt.Sprintf("已成功清理 %d 天前的 %d 条历史日志", days, affected),
+		"affected": affected,
+	})
+}
+
 // 上游凭据列表
 func AdminListUpstreamHandler(c *gin.Context) {
 	list, err := db.ListUpstreamCredentials()
@@ -315,6 +334,7 @@ func RegisterAdminRoutes(router *gin.Engine) {
 			protected.DELETE("/users/:id", AdminDeleteUserHandler)
 
 			protected.GET("/logs", AdminLogsHandler)
+			protected.POST("/logs/clean", AdminCleanLogsHandler)
 
 			protected.GET("/upstreams", AdminListUpstreamHandler)
 			protected.POST("/upstreams", AdminSaveUpstreamHandler)

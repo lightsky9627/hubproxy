@@ -121,6 +121,9 @@ func main() {
 		return
 	}
 
+	// 启动日志定期清理任务 (保留 30 天日志)
+	db.StartLogCleanupCron(30)
+
 	utils.InitHTTPClients()
 	globalLimiter = utils.InitGlobalLimiter()
 	handlers.InitDockerProxy()

@@ -253,6 +253,37 @@ func QueryPullLogs(limit, offset int, username, keyword string) ([]PullLog, int6
 	return logs, total, nil
 }
 
+// 清理指定天数前的历史拉取日志 (默认 30 天)
+func CleanOldPullLogs(retentionDays int) (int64, error) {
+	if DB == nil {
+		return 0, nil
+	}
+	if retentionDays <= 0 {
+		retentionDays = 30
+	}
+	cutoff := time.Now().AddDate(0, 0, -retentionDays).Format("2006-01-02 15:04:05")
+	res, err := DB.Exec(`DELETE FROM pull_logs WHERE created_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	affected, _ := res.RowsAffected()
+	return affected, nil
+}
+
+// 启动后台日志定期清理任务 (每 24 小时执行一次)
+func StartLogCleanupCron(retentionDays int) {
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		// 启动时先执行一次清理
+		_, _ = CleanOldPullLogs(retentionDays)
+
+		for range ticker.C {
+			_, _ = CleanOldPullLogs(retentionDays)
+		}
+	}()
+}
+
 // Upstream Credentials 操作
 func ListUpstreamCredentials() ([]UpstreamCredential, error) {
 	rows, err := DB.Query(`SELECT id, registry, username, password, is_enabled, created_at, updated_at FROM upstream_credentials ORDER BY id ASC`)
