@@ -836,39 +836,42 @@ docker pull ghcr.hub.bravexist.cn/home-assistant/core:latest</pre>
     }
 
     function getUserPrefix() {
-      return localStorage.getItem('hubproxy_custom_user_prefix') || 'gemini';
+      // 优先从 localStorage 获取用户之前输入的专属前缀，其次获取普通用户登录态中的用户名
+      const saved = localStorage.getItem('hubproxy_custom_user_prefix');
+      if (saved) return saved;
+      try {
+        const u = JSON.parse(localStorage.getItem('user_info') || '{}');
+        if (u && u.username) return u.username;
+      } catch (e) {}
+      return '';
     }
 
     function setUserPrefix(val) {
       if (val) {
         localStorage.setItem('hubproxy_custom_user_prefix', val);
+      } else {
+        localStorage.removeItem('hubproxy_custom_user_prefix');
       }
     }
 
     function handleUserPrefixChange() {
       const val = document.getElementById('userPrefixInput').value.trim();
-      if (val) {
-        setUserPrefix(val);
-      }
+      setUserPrefix(val);
       updateDetailPullCommand();
       renderTagsList(currentDetail.tagsList);
     }
 
     function buildTagPullCommand(registry, repository, tag) {
-      // 若没有提供 tag，且是 k8s 仓库，默认选用稳定版本 v1.11.1 占位，避免无脑 latest 导致 404
       let tagName = tag;
       if (!tagName) {
-        if (registry === 'registry.k8s.io' && repository.includes('ingress-nginx')) {
-          tagName = 'v1.11.1';
-        } else {
-          tagName = 'latest';
-        }
+        tagName = 'latest';
       }
 
-      // 如果是专属个人域名模式 (如 gemini.hub.bravexist.cn/ingress-nginx/controller:v1.11.1)
+      // 如果是专属个人域名模式 (如 <username>.hub.bravexist.cn/repository:tag)
       if (currentDetail.pullMode === 'user') {
-        const uPrefix = document.getElementById('userPrefixInput')?.value.trim() || getUserPrefix();
-        return `docker pull ${uPrefix}.${host}/${repository}:${tagName}`;
+        const rawPrefix = document.getElementById('userPrefixInput')?.value.trim() || getUserPrefix();
+        const displayPrefix = rawPrefix || '<username>';
+        return `docker pull ${displayPrefix}.${host}/${repository}:${tagName}`;
       }
 
       if (registry === 'docker.io' || !registry) {
@@ -1048,6 +1051,13 @@ docker pull ghcr.hub.bravexist.cn/home-assistant/core:latest</pre>
     }
 
     function copyDetailCommand() {
+      const input = document.getElementById('userPrefixInput');
+      if (currentDetail.pullMode === 'user' && (!input.value.trim())) {
+        input.focus();
+        input.classList.add('ring-2', 'ring-rose-500');
+        setTimeout(() => input.classList.remove('ring-2', 'ring-rose-500'), 1500);
+        return;
+      }
       const cmd = document.getElementById('detailPullCmdBox').textContent.trim();
       copyCommand(cmd, 'detailCopyBtn');
     }

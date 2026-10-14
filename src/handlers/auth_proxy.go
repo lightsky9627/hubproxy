@@ -76,21 +76,40 @@ func HandleDockerAuthToken(c *gin.Context) {
 		if mapSubdomainToRegistry(sub) != "" {
 			isRegistrySubdomain = true
 		} else if sub != "www" && sub != "hub" && sub != "api" {
-			// 普通用户个人空间子域名（如 qiankong.hub.bravexist.cn）免密签发
-			if user, err := db.GetUserByUsername(sub); err == nil && user != nil && user.IsEnabled {
-				if user.ExpiresAt == nil || time.Now().Before(*user.ExpiresAt) {
-					access := parseAccessFromScope(scope)
-					token, err := GenerateLocalToken(user.Username, user.IsAdmin, service, access, 4*time.Hour)
-					if err == nil {
-						c.JSON(http.StatusOK, gin.H{
-							"token":        token,
-							"access_token": token,
-							"expires_in":   14400,
-							"issued_at":    time.Now().Format(time.RFC3339),
-						})
-						return
-					}
-				}
+			// 普通用户个人空间专属子域名（如 user.hub.bravexist.cn）
+			user, err := db.GetUserByUsername(sub)
+			if err != nil || user == nil {
+				realm := fmt.Sprintf("%s://%s/token", getScheme(c), c.Request.Host)
+				c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s",service="%s",error="user_not_found"`, realm, service))
+				c.JSON(http.StatusUnauthorized, gin.H{"details": fmt.Sprintf("User '%s' not found", sub)})
+				return
+			}
+			if !user.IsEnabled {
+				c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s",service="%s",error="account_disabled"`, c.Request.URL.String(), service))
+				c.JSON(http.StatusForbidden, gin.H{"details": "Account disabled"})
+				return
+			}
+			if user.ExpiresAt != nil && time.Now().After(*user.ExpiresAt) {
+				c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s",service="%s",error="account_expired"`, c.Request.URL.String(), service))
+				c.JSON(http.StatusForbidden, gin.H{"details": "Account expired"})
+				return
+			}
+			if user.MonthlyTrafficQuota > 0 && user.UsedTrafficBytes >= user.MonthlyTrafficQuota {
+				c.JSON(http.StatusTooManyRequests, gin.H{"details": fmt.Sprintf("User monthly traffic quota exceeded (%d MB / %d MB)", user.UsedTrafficBytes/(1024*1024), user.MonthlyTrafficQuota/(1024*1024))})
+				return
+			}
+
+			// 签发该用户专属 JWT Token
+			access := parseAccessFromScope(scope)
+			token, err := GenerateLocalToken(user.Username, user.IsAdmin, service, access, 4*time.Hour)
+			if err == nil {
+				c.JSON(http.StatusOK, gin.H{
+					"token":        token,
+					"access_token": token,
+					"expires_in":   14400,
+					"issued_at":    time.Now().Format(time.RFC3339),
+				})
+				return
 			}
 		}
 	}
