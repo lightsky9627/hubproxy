@@ -100,6 +100,38 @@ func registryTargetFromMapping(name string, mapping config.RegistryMapping) regi
 		authRealm = strings.TrimPrefix(upstream, "https://")
 		authRealm = strings.TrimPrefix(authRealm, "http://")
 	}
+
+	// 强制自动规范化：针对知名 Registry 进行内置容错纠正，即使用户旧 config.toml 填了裸域名也能自适应
+	// 如果配置本身是自定义的完整 URL（例如 mock 测试服务器 http://127.0.0.1:xxx），则不强行覆盖
+	if !strings.HasPrefix(mapping.AuthHost, "http://") && !strings.HasPrefix(mapping.AuthHost, "https://") {
+		switch name {
+		case "registry.k8s.io":
+			if !strings.Contains(authRealm, "/token") {
+				authRealm = "registry.k8s.io/token"
+			}
+		case "nvcr.io":
+			if !strings.Contains(authRealm, "/proxy_auth") {
+				authRealm = "nvcr.io/proxy_auth"
+			}
+		case "docker.elastic.co":
+			if !strings.Contains(authRealm, "/auth") {
+				authRealm = "docker-auth.elastic.co/auth"
+			}
+		case "gcr.io":
+			if !strings.Contains(authRealm, "/token") {
+				authRealm = "gcr.io/v2/token"
+			}
+		case "ghcr.io":
+			if !strings.Contains(authRealm, "/token") {
+				authRealm = "ghcr.io/token"
+			}
+		case "quay.io":
+			if !strings.Contains(authRealm, "/auth") {
+				authRealm = "quay.io/v2/auth"
+			}
+		}
+	}
+
 	if !strings.HasPrefix(authRealm, "http://") && !strings.HasPrefix(authRealm, "https://") {
 		authRealm = "https://" + authRealm
 	}
