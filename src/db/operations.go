@@ -23,7 +23,7 @@ func GetUserByUsername(username string) (*User, error) {
 		return nil, sql.ErrNoRows
 	}
 	row := DB.QueryRow(`
-		SELECT id, username, password_hash, monthly_quota, used_quota, quota_month, 
+		SELECT id, username, password_hash, monthly_quota, used_quota, monthly_traffic_quota, used_traffic_bytes, quota_month, 
 		       is_enabled, is_admin, expires_at, remark, created_at, updated_at
 		FROM users WHERE username = ?
 	`, username)
@@ -31,7 +31,7 @@ func GetUserByUsername(username string) (*User, error) {
 	var u User
 	var expiresAt sql.NullTime
 	err := row.Scan(
-		&u.ID, &u.Username, &u.PasswordHash, &u.MonthlyQuota, &u.UsedQuota, &u.QuotaMonth,
+		&u.ID, &u.Username, &u.PasswordHash, &u.MonthlyQuota, &u.UsedQuota, &u.MonthlyTrafficQuota, &u.UsedTrafficBytes, &u.QuotaMonth,
 		&u.IsEnabled, &u.IsAdmin, &expiresAt, &u.Remark, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -45,7 +45,7 @@ func GetUserByUsername(username string) (*User, error) {
 
 func ListUsers() ([]User, error) {
 	rows, err := DB.Query(`
-		SELECT id, username, monthly_quota, used_quota, quota_month, 
+		SELECT id, username, monthly_quota, used_quota, monthly_traffic_quota, used_traffic_bytes, quota_month, 
 		       is_enabled, is_admin, expires_at, remark, created_at, updated_at
 		FROM users ORDER BY id ASC
 	`)
@@ -59,7 +59,7 @@ func ListUsers() ([]User, error) {
 		var u User
 		var expiresAt sql.NullTime
 		if err := rows.Scan(
-			&u.ID, &u.Username, &u.MonthlyQuota, &u.UsedQuota, &u.QuotaMonth,
+			&u.ID, &u.Username, &u.MonthlyQuota, &u.UsedQuota, &u.MonthlyTrafficQuota, &u.UsedTrafficBytes, &u.QuotaMonth,
 			&u.IsEnabled, &u.IsAdmin, &expiresAt, &u.Remark, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -72,31 +72,31 @@ func ListUsers() ([]User, error) {
 	return users, nil
 }
 
-func CreateUser(username, password string, monthlyQuota int64, isAdmin bool, expiresAt *time.Time, remark string) error {
+func CreateUser(username, password string, monthlyQuota, monthlyTrafficQuota int64, isAdmin bool, expiresAt *time.Time, remark string) error {
 	now := time.Now()
 	month := now.Format("2006-01")
 	hash := HashPassword(password)
 	_, err := DB.Exec(`
-		INSERT INTO users (username, password_hash, monthly_quota, used_quota, quota_month, is_enabled, is_admin, expires_at, remark, created_at, updated_at)
-		VALUES (?, ?, ?, 0, ?, 1, ?, ?, ?, ?, ?)
-	`, username, hash, monthlyQuota, month, isAdmin, expiresAt, remark, now, now)
+		INSERT INTO users (username, password_hash, monthly_quota, used_quota, monthly_traffic_quota, used_traffic_bytes, quota_month, is_enabled, is_admin, expires_at, remark, created_at, updated_at)
+		VALUES (?, ?, ?, 0, ?, 0, ?, 1, ?, ?, ?, ?, ?)
+	`, username, hash, monthlyQuota, monthlyTrafficQuota, month, isAdmin, expiresAt, remark, now, now)
 	return err
 }
 
-func UpdateUser(id int64, password string, monthlyQuota int64, isEnabled bool, isAdmin bool, expiresAt *time.Time, remark string) error {
+func UpdateUser(id int64, password string, monthlyQuota, monthlyTrafficQuota int64, isEnabled bool, isAdmin bool, expiresAt *time.Time, remark string) error {
 	now := time.Now()
 	if password != "" {
 		hash := HashPassword(password)
 		_, err := DB.Exec(`
-			UPDATE users SET password_hash = ?, monthly_quota = ?, is_enabled = ?, is_admin = ?, expires_at = ?, remark = ?, updated_at = ?
+			UPDATE users SET password_hash = ?, monthly_quota = ?, monthly_traffic_quota = ?, is_enabled = ?, is_admin = ?, expires_at = ?, remark = ?, updated_at = ?
 			WHERE id = ?
-		`, hash, monthlyQuota, isEnabled, isAdmin, expiresAt, remark, now, id)
+		`, hash, monthlyQuota, monthlyTrafficQuota, isEnabled, isAdmin, expiresAt, remark, now, id)
 		return err
 	}
 	_, err := DB.Exec(`
-		UPDATE users SET monthly_quota = ?, is_enabled = ?, is_admin = ?, expires_at = ?, remark = ?, updated_at = ?
+		UPDATE users SET monthly_quota = ?, monthly_traffic_quota = ?, is_enabled = ?, is_admin = ?, expires_at = ?, remark = ?, updated_at = ?
 		WHERE id = ?
-	`, monthlyQuota, isEnabled, isAdmin, expiresAt, remark, now, id)
+	`, monthlyQuota, monthlyTrafficQuota, isEnabled, isAdmin, expiresAt, remark, now, id)
 	return err
 }
 
@@ -105,7 +105,7 @@ func DeleteUser(id int64) error {
 	return err
 }
 
-// 检查并扣除配额（按自然月重置）
+// 检查并扣除配额（按自然月重置，同时检查次数和总流量配额）
 func CheckAndConsumeUserQuota(username string) (bool, string) {
 	if DB == nil {
 		return true, ""
@@ -124,8 +124,13 @@ func CheckAndConsumeUserQuota(username string) (bool, string) {
 		return false, "账号已过期"
 	}
 
+	// 流量超限检查 (月流量上限 > 0 且已用流量 >= 上限)
+	if user.MonthlyTrafficQuota > 0 && user.UsedTrafficBytes >= user.MonthlyTrafficQuota {
+		return false, fmt.Sprintf("当月总流量已耗尽 (%d MB / %d MB)", user.UsedTrafficBytes/(1024*1024), user.MonthlyTrafficQuota/(1024*1024))
+	}
+
 	if user.MonthlyQuota <= 0 {
-		// 无限制配额
+		// 无限制次数配额
 		return true, ""
 	}
 
@@ -133,7 +138,7 @@ func CheckAndConsumeUserQuota(username string) (bool, string) {
 	used := user.UsedQuota
 	if user.QuotaMonth != currentMonth {
 		used = 0
-		_, _ = DB.Exec(`UPDATE users SET used_quota = 0, quota_month = ? WHERE username = ?`, currentMonth, username)
+		_, _ = DB.Exec(`UPDATE users SET used_quota = 0, used_traffic_bytes = 0, quota_month = ? WHERE username = ?`, currentMonth, username)
 	}
 
 	if used >= user.MonthlyQuota {
@@ -145,28 +150,19 @@ func CheckAndConsumeUserQuota(username string) (bool, string) {
 	return true, ""
 }
 
-// 检查并扣除 IP 匿名配额
-func CheckAndConsumeIPQuota(ip string, monthlyLimit int64) (bool, string) {
-	if monthlyLimit <= 0 || DB == nil {
-		return true, ""
+// 累计增加用户已消耗流量
+func AddUserTraffic(username string, bytes int64) {
+	if DB == nil || bytes <= 0 {
+		return
 	}
-
 	currentMonth := time.Now().Format("2006-01")
-	// 统计当前 IP 在本月的匿名拉取次数
-	var count int64
-	err := DB.QueryRow(`
-		SELECT COUNT(*) FROM pull_logs 
-		WHERE client_ip = ? AND username = 'anonymous' AND strftime('%Y-%m', created_at) = ?
-	`, ip, currentMonth).Scan(&count)
-	if err != nil {
-		return true, "" // 查询异常时放行
-	}
-
-	if count >= monthlyLimit {
-		return false, fmt.Sprintf("匿名用户本月拉取次数已达上限 (%d/%d)", count, monthlyLimit)
-	}
-
-	return true, ""
+	_, _ = DB.Exec(`
+		UPDATE users 
+		SET used_traffic_bytes = used_traffic_bytes + ?,
+		    quota_month = CASE WHEN quota_month = ? THEN quota_month ELSE ? END,
+		    used_quota = CASE WHEN quota_month = ? THEN used_quota ELSE 0 END
+		WHERE username = ?
+	`, bytes, currentMonth, currentMonth, currentMonth, username)
 }
 
 // PullLog 操作
@@ -178,9 +174,14 @@ func RecordPullLog(log PullLog) {
 		log.CreatedAt = time.Now()
 	}
 	_, _ = DB.Exec(`
-		INSERT INTO pull_logs (username, client_ip, registry, image, action, status, duration_ms, user_agent, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, log.Username, log.ClientIP, log.Registry, log.Image, log.Action, log.Status, log.DurationMs, log.UserAgent, log.CreatedAt)
+		INSERT INTO pull_logs (username, client_ip, registry, image, action, status, duration_ms, bytes_sent, user_agent, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, log.Username, log.ClientIP, log.Registry, log.Image, log.Action, log.Status, log.DurationMs, log.BytesSent, log.UserAgent, log.CreatedAt)
+
+	// 同时将消耗的流量累计到对应用户（或 anonymous 统一虚拟用户）
+	if log.BytesSent > 0 && log.Username != "" {
+		AddUserTraffic(log.Username, log.BytesSent)
+	}
 }
 
 func QueryPullLogs(limit, offset int, username, keyword string) ([]PullLog, int64, error) {
@@ -203,7 +204,7 @@ func QueryPullLogs(limit, offset int, username, keyword string) ([]PullLog, int6
 		return nil, 0, err
 	}
 
-	dataSQL := `SELECT id, username, client_ip, registry, image, action, status, duration_ms, user_agent, created_at ` +
+	dataSQL := `SELECT id, username, client_ip, registry, image, action, status, duration_ms, bytes_sent, user_agent, created_at ` +
 		query + ` ORDER BY id DESC LIMIT ? OFFSET ?`
 	args = append(args, limit, offset)
 
@@ -218,7 +219,7 @@ func QueryPullLogs(limit, offset int, username, keyword string) ([]PullLog, int6
 		var l PullLog
 		if err := rows.Scan(
 			&l.ID, &l.Username, &l.ClientIP, &l.Registry, &l.Image,
-			&l.Action, &l.Status, &l.DurationMs, &l.UserAgent, &l.CreatedAt,
+			&l.Action, &l.Status, &l.DurationMs, &l.BytesSent, &l.UserAgent, &l.CreatedAt,
 		); err != nil {
 			return nil, 0, err
 		}

@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -135,22 +134,19 @@ func HandleDockerAuthToken(c *gin.Context) {
 		return
 	}
 
-	// 3. 匿名用户认证请求
+	// 3. 匿名用户认证请求：统一使用 "anonymous" 虚拟用户的配置进行统一流量管控
 	allowAnonymous := db.GetSetting("allow_anonymous", "true") == "true"
-	if !allowAnonymous {
-		// 不允许匿名拉取，直接要求登录
+	anonUser, _ := db.GetUserByUsername("anonymous")
+	if !allowAnonymous || (anonUser != nil && !anonUser.IsEnabled) {
 		realm := fmt.Sprintf("%s://%s/token", getScheme(c), c.Request.Host)
 		c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s",service="%s",error="unauthorized"`, realm, service))
 		c.String(http.StatusUnauthorized, "Unauthorized: authentication required")
 		return
 	}
 
-	// 检查匿名月度限额 (按客户端 IP 统计)
-	anonLimitStr := db.GetSetting("anonymous_monthly_quota", "50")
-	anonLimit, _ := strconv.ParseInt(anonLimitStr, 10, 64)
-	clientIP := c.ClientIP()
-	if ok, reason := db.CheckAndConsumeIPQuota(clientIP, anonLimit); !ok {
-		c.String(http.StatusTooManyRequests, reason)
+	// 检查匿名用户总流量是否超出配额（例如 50GB）
+	if anonUser != nil && anonUser.MonthlyTrafficQuota > 0 && anonUser.UsedTrafficBytes >= anonUser.MonthlyTrafficQuota {
+		c.String(http.StatusTooManyRequests, fmt.Sprintf("匿名拉取当月总流量已达上限 (%d MB / %d MB)", anonUser.UsedTrafficBytes/(1024*1024), anonUser.MonthlyTrafficQuota/(1024*1024)))
 		return
 	}
 

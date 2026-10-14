@@ -224,6 +224,23 @@ func isDockerHubAlias(name string) bool {
 }
 
 // 透明代理 Docker Registry API v2 请求。
+type responseBodyCounter struct {
+	gin.ResponseWriter
+	bytesWritten int64
+}
+
+func (w *responseBodyCounter) Write(b []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(b)
+	w.bytesWritten += int64(n)
+	return n, err
+}
+
+func (w *responseBodyCounter) WriteString(s string) (int, error) {
+	n, err := w.ResponseWriter.WriteString(s)
+	w.bytesWritten += int64(n)
+	return n, err
+}
+
 func ProxyDockerRegistryGin(c *gin.Context) {
 	path := c.Request.URL.Path
 
@@ -308,14 +325,14 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		return
 	}
 
-	// 如果禁止匿名拉取，且当前未认证为本地用户，则直接要求认证返回 401
+	// 检查匿名用户总流量与拉取状态
 	if username == "anonymous" {
 		allowAnonymous := db.GetSetting("allow_anonymous", "true") == "true"
-		if !allowAnonymous {
+		// 检查 anonymous 虚拟用户状态与月度总流量上限（例如 50GB）
+		anonUser, _ := db.GetUserByUsername("anonymous")
+		if !allowAnonymous || (anonUser != nil && !anonUser.IsEnabled) {
 			target, _ := resolveRegistryTarget(c, strings.TrimPrefix(path, "/v2/"))
 			baseURL := publicBaseURL(c)
-			// 注意：service 必须设置为当前请求的 Host (例如 hub.bravexist.cn)，
-			// 否则 Docker 客户端在检查 ~/.docker/config.json 发现 service 与登录域名不一致时，会拒绝携带 Basic Auth 凭据
 			challengeService := c.Request.Host
 			c.Header("Www-Authenticate", fmt.Sprintf(`Bearer realm="%s/token/%s",service="%s",error="unauthorized"`, baseURL, target.Name, challengeService))
 			c.Header("Docker-Distribution-API-Version", "registry/2.0")
@@ -329,11 +346,20 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 			})
 			return
 		}
+
+		if anonUser != nil && anonUser.MonthlyTrafficQuota > 0 && anonUser.UsedTrafficBytes >= anonUser.MonthlyTrafficQuota {
+			c.String(http.StatusTooManyRequests, fmt.Sprintf("匿名拉取当月总流量已达上限 (%d MB / %d MB)", anonUser.UsedTrafficBytes/(1024*1024), anonUser.MonthlyTrafficQuota/(1024*1024)))
+			return
+		}
 	}
+
+	// 记录真实响应流量
+	countingWriter := &responseBodyCounter{ResponseWriter: c.Writer}
+	c.Writer = countingWriter
 
 	handleRegistryRequest(c, path)
 
-	// 记录拉取日志 (保留原汁原味日志，记录每次真实请求)
+	// 记录拉取日志并累计流量 (保留原汁原味日志，记录每次真实请求与传输流量)
 	if strings.Contains(path, "/manifests/") || strings.Contains(path, "/blobs/") {
 		status := c.Writer.Status()
 		pathWithoutV2 := strings.TrimPrefix(path, "/v2/")
@@ -341,6 +367,7 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		imageName, apiType, _ := parseRegistryPath(targetPath)
 		if imageName != "" {
 			duration := time.Since(start).Milliseconds()
+			bytesSent := countingWriter.bytesWritten
 			go db.RecordPullLog(db.PullLog{
 				Username:   username,
 				ClientIP:   c.ClientIP(),
@@ -349,6 +376,7 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 				Action:     apiType,
 				Status:     status,
 				DurationMs: duration,
+				BytesSent:  bytesSent,
 				UserAgent:  c.Request.UserAgent(),
 			})
 		}

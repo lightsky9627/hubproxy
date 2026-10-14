@@ -17,31 +17,34 @@ var (
 )
 
 type User struct {
-	ID           int64      `json:"id"`
-	Username     string     `json:"username"`
-	PasswordHash string     `json:"-"`
-	MonthlyQuota int64      `json:"monthly_quota"` // 每月限额拉取次数，0 表示无限制
-	UsedQuota    int64      `json:"used_quota"`    // 当前自然月已用次数
-	QuotaMonth   string     `json:"quota_month"`   // 当前统计月份，如 "2026-10"
-	IsEnabled    bool       `json:"is_enabled"`
-	IsAdmin      bool       `json:"is_admin"`
-	ExpiresAt    *time.Time `json:"expires_at"` // 到期时间，nil 表示永不过期
-	Remark       string     `json:"remark"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID                     int64      `json:"id"`
+	Username               string     `json:"username"`
+	PasswordHash           string     `json:"-"`
+	MonthlyQuota           int64      `json:"monthly_quota"`             // 每月限额拉取次数，0 表示无限制
+	UsedQuota              int64      `json:"used_quota"`                // 当前自然月已用次数
+	MonthlyTrafficQuota    int64      `json:"monthly_traffic_quota"`     // 每月流量上限（字节），0 表示无限制，例如 50GB = 53687091200
+	UsedTrafficBytes       int64      `json:"used_traffic_bytes"`        // 当前自然月已用流量字节
+	QuotaMonth             string     `json:"quota_month"`               // 当前统计月份，如 "2026-10"
+	IsEnabled              bool       `json:"is_enabled"`
+	IsAdmin                bool       `json:"is_admin"`
+	ExpiresAt              *time.Time `json:"expires_at"`                // 到期时间，nil 表示永不过期
+	Remark                 string     `json:"remark"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type PullLog struct {
-	ID        int64     `json:"id"`
-	Username  string    `json:"username"` // 匿名则为 "anonymous"
-	ClientIP  string    `json:"client_ip"`
-	Registry  string    `json:"registry"` // 目标 registry，如 docker.io, ghcr.io
-	Image     string    `json:"image"`    // 镜像名
-	Action    string    `json:"action"`   // pull, manifest, search, tar
-	Status    int       `json:"status"`   // HTTP 状态码
-	DurationMs int64    `json:"duration_ms"`
-	UserAgent string    `json:"user_agent"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         int64     `json:"id"`
+	Username   string    `json:"username"` // 匿名则为 "anonymous"
+	ClientIP   string    `json:"client_ip"`
+	Registry   string    `json:"registry"` // 目标 registry，如 docker.io, ghcr.io
+	Image      string    `json:"image"`    // 镜像名
+	Action     string    `json:"action"`   // pull, manifest, search, tar
+	Status     int       `json:"status"`   // HTTP 状态码
+	DurationMs int64     `json:"duration_ms"`
+	BytesSent  int64     `json:"bytes_sent"` // 传输流量（字节）
+	UserAgent  string    `json:"user_agent"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type UpstreamCredential struct {
@@ -108,6 +111,8 @@ func createTables() error {
 		password_hash TEXT NOT NULL,
 		monthly_quota INTEGER NOT NULL DEFAULT 0,
 		used_quota INTEGER NOT NULL DEFAULT 0,
+		monthly_traffic_quota INTEGER NOT NULL DEFAULT 0,
+		used_traffic_bytes INTEGER NOT NULL DEFAULT 0,
 		quota_month TEXT NOT NULL DEFAULT '',
 		is_enabled INTEGER NOT NULL DEFAULT 1,
 		is_admin INTEGER NOT NULL DEFAULT 0,
@@ -126,6 +131,7 @@ func createTables() error {
 		action TEXT NOT NULL DEFAULT '',
 		status INTEGER NOT NULL DEFAULT 200,
 		duration_ms INTEGER NOT NULL DEFAULT 0,
+		bytes_sent INTEGER NOT NULL DEFAULT 0,
 		user_agent TEXT NOT NULL DEFAULT '',
 		created_at DATETIME NOT NULL
 	);
@@ -150,32 +156,49 @@ func createTables() error {
 	);
 	`
 	_, err := DB.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 自动无损数据库迁移 (为已存在的 users 和 pull_logs 表追加新字段)
+	_, _ = DB.Exec(`ALTER TABLE users ADD COLUMN monthly_traffic_quota INTEGER NOT NULL DEFAULT 0;`)
+	_, _ = DB.Exec(`ALTER TABLE users ADD COLUMN used_traffic_bytes INTEGER NOT NULL DEFAULT 0;`)
+	_, _ = DB.Exec(`ALTER TABLE pull_logs ADD COLUMN bytes_sent INTEGER NOT NULL DEFAULT 0;`)
+
+	return nil
 }
 
 func initDefaultData() error {
 	// 初始化系统默认设置
 	defaultSettings := map[string]string{
-		"allow_anonymous":         "true", // 是否允许匿名拉取
-		"anonymous_monthly_quota": "50",   // 每个IP匿名拉取的月限额（0为不限）
-		"allow_passthrough":       "true", // 是否允许未在本地注册的 docker hub 用户账号透传
+		"allow_anonymous": "true", // 是否允许匿名拉取 (由 anonymous 虚拟用户的 is_enabled 协同管控)
 	}
 
 	for k, v := range defaultSettings {
 		_, _ = DB.Exec(`INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)`, k, v)
 	}
 
+	now := time.Now()
+	currentMonth := now.Format("2006-01")
+
 	// 初始化默认管理员 admin / admin123456 (如果不存在任何管理员)
-	var count int
-	err := DB.QueryRow(`SELECT COUNT(*) FROM users WHERE is_admin = 1`).Scan(&count)
-	if err == nil && count == 0 {
-		now := time.Now()
-		// SHA256 of "admin123456" = "e10adc3949ba59abbe56e057f20f883e" (md5) or sha256
-		// 我们用 sha256: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
+	var adminCount int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM users WHERE is_admin = 1`).Scan(&adminCount)
+	if err == nil && adminCount == 0 {
 		adminHash := HashPassword("admin123456")
-		_, _ = DB.Exec(`INSERT INTO users (username, password_hash, monthly_quota, used_quota, quota_month, is_enabled, is_admin, remark, created_at, updated_at) 
-			VALUES (?, ?, ?, 0, ?, 1, 1, '默认超级管理员', ?, ?)`,
-			"admin", adminHash, 0, now.Format("2006-01"), now, now)
+		_, _ = DB.Exec(`INSERT INTO users (username, password_hash, monthly_quota, used_quota, monthly_traffic_quota, used_traffic_bytes, quota_month, is_enabled, is_admin, remark, created_at, updated_at) 
+			VALUES (?, ?, 0, 0, 0, 0, ?, 1, 1, '默认超级管理员', ?, ?)`,
+			"admin", adminHash, currentMonth, now, now)
+	}
+
+	// 初始化/确保统一虚拟匿名用户 "anonymous"（默认总流量 50GB = 53687091200 字节，可在后台自由修改或禁用）
+	var anonCount int
+	err = DB.QueryRow(`SELECT COUNT(*) FROM users WHERE username = 'anonymous'`).Scan(&anonCount)
+	if err == nil && anonCount == 0 {
+		const default50GB = int64(50) * 1024 * 1024 * 1024
+		_, _ = DB.Exec(`INSERT INTO users (username, password_hash, monthly_quota, used_quota, monthly_traffic_quota, used_traffic_bytes, quota_month, is_enabled, is_admin, remark, created_at, updated_at) 
+			VALUES ('anonymous', '', 0, 0, ?, 0, ?, 1, 0, '全局匿名拉取配额统一管控账号', ?, ?)`,
+			default50GB, currentMonth, now, now)
 	}
 
 	return nil

@@ -1,97 +1,65 @@
 [server]
-# 可通过 CONFIG_PATH 环境变量指定配置文件路径，默认读取当前工作目录下的 config.toml
 host = "0.0.0.0"
-# 监听端口
 port = 5000
-# 管理后台自定义路径（默认 /admin，可自定义如 /my-secret-admin；若设为空则完全关闭后台）
+# 管理后台安全路径，可自定义如 "/admin" 或 "/secret-admin"；留空 "" 则关闭后台入口
 adminPath = "/admin"
-# HTTP/2 多路复用
 enableH2C = false
 enableFrontend = true
 
 [rateLimit]
-# 每个IP每周期允许的请求数
-requestLimit = 500
-# 限流周期（小时）
-periodHours = 3.0
+requestLimit = 1000
+periodHours = 1.0
 
 [security]
-# IP白名单，支持单个IP或IP段
-# 白名单中的IP不受限流限制
-whiteList = [
-    "127.0.0.1",
-    "172.17.0.0/16",
-    "192.168.1.0/24"
-]
-
-# IP黑名单，支持单个IP或IP段
-# 黑名单中的IP将被直接拒绝访问
-blackList = [
-    "192.168.100.1",
-    "192.168.100.0/24"
-]
+whiteList = []
+blackList = []
 
 [access]
-# 镜像代理白名单（为空时不限制）
+# 镜像代理黑白名单（留空表示不限制）
 whiteList = []
+blackList = []
+# 外网代理 (支持 http:// 或 socks5://，国内拉取外网慢时可配置)
+proxy = ""
 
-# 镜像代理黑名单
-blackList = [
-    "baduser/malicious-repo",
-    "*/malicious-repo",
-    "baduser/*"
-]
-
-# 代理配置，支持 socks5 / http 代理
-# 留空不使用代理
-proxy = "" 
-
-# Registry映射配置，支持多种镜像仓库上游
+# 8 大主流官方镜像源标准化映射
 [registries]
 
-# GitHub Container Registry
 [registries."ghcr.io"]
 upstream = "ghcr.io"
-authHost = "ghcr.io/token" 
+authHost = "ghcr.io/token"
 authType = "github"
 enabled = true
 
-# Google Container Registry
 [registries."gcr.io"]
 upstream = "gcr.io"
 authHost = "gcr.io/v2/token"
 authType = "google"
 enabled = true
 
-# Quay.io Container Registry
 [registries."quay.io"]
 upstream = "quay.io"
 authHost = "quay.io/v2/auth"
 authType = "quay"
 enabled = true
 
-# Kubernetes Container Registry
 [registries."registry.k8s.io"]
 upstream = "registry.k8s.io"
 authHost = "registry.k8s.io/token"
 authType = "anonymous"
 enabled = true
 
-# Microsoft Container Registry
 [registries."mcr.microsoft.com"]
 upstream = "mcr.microsoft.com"
 authHost = "mcr.microsoft.com"
 authType = "anonymous"
 enabled = true
 
-# NVIDIA NGC Registry
 [registries."nvcr.io"]
 upstream = "nvcr.io"
 authHost = "nvcr.io/proxy_auth"
 authType = "anonymous"
 enabled = true
 
-# Elastic Container Registry
 [registries."docker.elastic.co"]
 upstream = "docker.elastic.co"
 authHost = "docker-auth.elastic.co/auth"
@@ -99,7 +67,5 @@ authType = "anonymous"
 enabled = true
 
 [tokenCache]
-# 是否启用缓存(同时控制Token和Manifest缓存)显著提升性能
 enabled = true
-# 默认缓存时间(分钟)
 defaultTTL = "20m"

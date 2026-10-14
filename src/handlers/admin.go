@@ -52,7 +52,7 @@ func AdminLoginHandler(c *gin.Context) {
 // 获取仪表盘统计数据
 func AdminStatsHandler(c *gin.Context) {
 	var totalUsers int64
-	_ = db.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&totalUsers)
+	_ = db.DB.QueryRow(`SELECT COUNT(*) FROM users WHERE username != 'anonymous'`).Scan(&totalUsers)
 
 	var totalPulls int64
 	_ = db.DB.QueryRow(`SELECT COUNT(*) FROM pull_logs`).Scan(&totalPulls)
@@ -65,11 +65,19 @@ func AdminStatsHandler(c *gin.Context) {
 	todayStr := time.Now().Format("2006-01-02")
 	_ = db.DB.QueryRow(`SELECT COUNT(*) FROM pull_logs WHERE date(created_at) = ?`, todayStr).Scan(&todayPulls)
 
+	var totalTraffic int64
+	_ = db.DB.QueryRow(`SELECT COALESCE(SUM(bytes_sent), 0) FROM pull_logs`).Scan(&totalTraffic)
+
+	var monthlyTraffic int64
+	_ = db.DB.QueryRow(`SELECT COALESCE(SUM(bytes_sent), 0) FROM pull_logs WHERE strftime('%Y-%m', created_at) = ?`, currentMonth).Scan(&monthlyTraffic)
+
 	c.JSON(http.StatusOK, gin.H{
-		"total_users":   totalUsers,
-		"total_pulls":   totalPulls,
-		"monthly_pulls": monthlyPulls,
-		"today_pulls":   todayPulls,
+		"total_users":     totalUsers,
+		"total_pulls":     totalPulls,
+		"monthly_pulls":   monthlyPulls,
+		"today_pulls":     todayPulls,
+		"total_traffic":   totalTraffic,
+		"monthly_traffic": monthlyTraffic,
 	})
 }
 
@@ -86,12 +94,13 @@ func AdminListUsersHandler(c *gin.Context) {
 // 创建用户
 func AdminCreateUserHandler(c *gin.Context) {
 	var req struct {
-		Username     string  `json:"username"`
-		Password     string  `json:"password"`
-		MonthlyQuota int64   `json:"monthly_quota"`
-		IsAdmin      bool    `json:"is_admin"`
-		ExpiresAt    *string `json:"expires_at"`
-		Remark       string  `json:"remark"`
+		Username            string  `json:"username"`
+		Password            string  `json:"password"`
+		MonthlyQuota        int64   `json:"monthly_quota"`
+		MonthlyTrafficQuota int64   `json:"monthly_traffic_quota"` // 流量配额（字节）
+		IsAdmin             bool    `json:"is_admin"`
+		ExpiresAt           *string `json:"expires_at"`
+		Remark              string  `json:"remark"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -106,7 +115,7 @@ func AdminCreateUserHandler(c *gin.Context) {
 		}
 	}
 
-	err := db.CreateUser(req.Username, req.Password, req.MonthlyQuota, req.IsAdmin, exp, req.Remark)
+	err := db.CreateUser(req.Username, req.Password, req.MonthlyQuota, req.MonthlyTrafficQuota, req.IsAdmin, exp, req.Remark)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建用户失败: " + err.Error()})
 		return
@@ -120,12 +129,13 @@ func AdminUpdateUserHandler(c *gin.Context) {
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 
 	var req struct {
-		Password     string  `json:"password"`
-		MonthlyQuota int64   `json:"monthly_quota"`
-		IsEnabled    bool    `json:"is_enabled"`
-		IsAdmin      bool    `json:"is_admin"`
-		ExpiresAt    *string `json:"expires_at"`
-		Remark       string  `json:"remark"`
+		Password            string  `json:"password"`
+		MonthlyQuota        int64   `json:"monthly_quota"`
+		MonthlyTrafficQuota int64   `json:"monthly_traffic_quota"` // 流量配额（字节）
+		IsEnabled           bool    `json:"is_enabled"`
+		IsAdmin             bool    `json:"is_admin"`
+		ExpiresAt           *string `json:"expires_at"`
+		Remark              string  `json:"remark"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -140,7 +150,7 @@ func AdminUpdateUserHandler(c *gin.Context) {
 		}
 	}
 
-	err := db.UpdateUser(id, req.Password, req.MonthlyQuota, req.IsEnabled, req.IsAdmin, exp, req.Remark)
+	err := db.UpdateUser(id, req.Password, req.MonthlyQuota, req.MonthlyTrafficQuota, req.IsEnabled, req.IsAdmin, exp, req.Remark)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新用户失败: " + err.Error()})
 		return
