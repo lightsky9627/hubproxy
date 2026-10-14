@@ -18,6 +18,31 @@ func VerifyPassword(raw, hash string) bool {
 }
 
 // User CRUD
+func GetUserByID(id int64) (*User, error) {
+	if DB == nil {
+		return nil, sql.ErrNoRows
+	}
+	row := DB.QueryRow(`
+		SELECT id, username, password_hash, monthly_quota, used_quota, monthly_traffic_quota, used_traffic_bytes, quota_month, 
+		       is_enabled, is_admin, expires_at, remark, created_at, updated_at
+		FROM users WHERE id = ?
+	`, id)
+
+	var u User
+	var expiresAt sql.NullTime
+	err := row.Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.MonthlyQuota, &u.UsedQuota, &u.MonthlyTrafficQuota, &u.UsedTrafficBytes, &u.QuotaMonth,
+		&u.IsEnabled, &u.IsAdmin, &expiresAt, &u.Remark, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if expiresAt.Valid {
+		u.ExpiresAt = &expiresAt.Time
+	}
+	return &u, nil
+}
+
 func GetUserByUsername(username string) (*User, error) {
 	if DB == nil {
 		return nil, sql.ErrNoRows

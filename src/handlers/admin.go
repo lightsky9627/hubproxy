@@ -123,34 +123,84 @@ func AdminCreateUserHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "创建成功"})
 }
 
-// 更新用户
+// 更新用户 (支持修改密码、配额、备注、启用/禁用)
 func AdminUpdateUserHandler(c *gin.Context) {
 	idStr := c.Param("id")
-	id, _ := strconv.ParseInt(idStr, 10, 64)
-
-	var req struct {
-		Password            string  `json:"password"`
-		MonthlyQuota        int64   `json:"monthly_quota"`
-		MonthlyTrafficQuota int64   `json:"monthly_traffic_quota"` // 流量配额（字节）
-		IsEnabled           bool    `json:"is_enabled"`
-		IsAdmin             bool    `json:"is_admin"`
-		ExpiresAt           *string `json:"expires_at"`
-		Remark              string  `json:"remark"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
 		return
 	}
 
-	var exp *time.Time
-	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
-		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)
-		if err == nil {
-			exp = &t
+	existingUser, err := db.GetUserByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		return
+	}
+
+	var req struct {
+		Password            string  `json:"password"`
+		MonthlyQuota        *int64  `json:"monthly_quota"`
+		MonthlyTrafficQuota *int64  `json:"monthly_traffic_quota"` // 流量配额（字节）
+		IsEnabled           *bool   `json:"is_enabled"`
+		IsAdmin             *bool   `json:"is_admin"`
+		ExpiresAt           *string `json:"expires_at"`
+		Remark              *string `json:"remark"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+		return
+	}
+
+	monthlyQuota := existingUser.MonthlyQuota
+	if req.MonthlyQuota != nil {
+		monthlyQuota = *req.MonthlyQuota
+	}
+
+	monthlyTrafficQuota := existingUser.MonthlyTrafficQuota
+	if req.MonthlyTrafficQuota != nil {
+		monthlyTrafficQuota = *req.MonthlyTrafficQuota
+	}
+
+	isEnabled := existingUser.IsEnabled
+	if req.IsEnabled != nil {
+		// anonymous 用户不可被禁用
+		if existingUser.Username == "anonymous" && !*req.IsEnabled {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "系统内置 anonymous 匿名账户不可禁用"})
+			return
+		}
+		isEnabled = *req.IsEnabled
+	}
+
+	isAdmin := existingUser.IsAdmin
+	if req.IsAdmin != nil {
+		isAdmin = *req.IsAdmin
+	}
+
+	remark := existingUser.Remark
+	if req.Remark != nil {
+		remark = *req.Remark
+	}
+
+	exp := existingUser.ExpiresAt
+	if req.ExpiresAt != nil {
+		if *req.ExpiresAt == "" {
+			exp = nil
+		} else {
+			t, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+			if err == nil {
+				exp = &t
+			}
 		}
 	}
 
-	err := db.UpdateUser(id, req.Password, req.MonthlyQuota, req.MonthlyTrafficQuota, req.IsEnabled, req.IsAdmin, exp, req.Remark)
+	// 如果修改密码且是 anonymous，禁止修改
+	if req.Password != "" && existingUser.Username == "anonymous" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "anonymous 账户不可设置密码"})
+		return
+	}
+
+	err = db.UpdateUser(id, req.Password, monthlyQuota, monthlyTrafficQuota, isEnabled, isAdmin, exp, remark)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新用户失败: " + err.Error()})
 		return
