@@ -640,9 +640,15 @@
     }
 
     function buildTagPullCommand(registry, repository, tag) {
-      const tagName = tag || 'latest';
-      const rootDomain = host.replace(/^[^\.]+\./, ''); // 提取顶级/二级根域名，如 hub.bravexist.cn
-      const baseHub = host.includes('.') ? host : `${host}.bravexist.cn`;
+      // 若没有提供 tag，且是 k8s 仓库，默认选用稳定版本 v1.11.1 占位，避免无脑 latest 导致 404
+      let tagName = tag;
+      if (!tagName) {
+        if (registry === 'registry.k8s.io' && repository.includes('ingress-nginx')) {
+          tagName = 'v1.11.1';
+        } else {
+          tagName = 'latest';
+        }
+      }
 
       if (registry === 'docker.io' || !registry) {
         // Docker Hub 直接拉取
@@ -881,7 +887,7 @@
             displayImage = `${registry}/${rawName}`;
           }
 
-          const pullCmd = `docker pull ${host}/${displayImage}:latest`;
+          const pullCmd = buildTagPullCommand(registry, rawName, '');
           const btnId = `copy-btn-${idx}`;
 
           return `
