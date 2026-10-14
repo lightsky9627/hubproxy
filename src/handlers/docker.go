@@ -633,7 +633,7 @@ func proxyRegistryHTTP(c *gin.Context, target registryTarget, upstreamPath strin
 			if err == nil {
 				forwardSelectedRequestHeaders(redirectReq.Header, c.Request.Header)
 				redirectReq.Header.Del("Authorization") // S3/Cloudflare 签名 URL 不需要且不能带原有 Registry Bearer Token
-				redirectResp, err := utils.GetGlobalHTTPClient().Do(redirectReq)
+				redirectResp, err := utils.GetRedirectHTTPClient().Do(redirectReq)
 				if err == nil {
 					defer redirectResp.Body.Close()
 					for k, vv := range redirectResp.Header {
