@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -682,6 +683,71 @@ func getRepositoryTagsEx(ctx context.Context, registry, repository string, page,
 	}, nil
 }
 
+// compareSemver 比较两个镜像版本，返回 a 是否大于 b (用于倒序排列，最新版本排在最前)
+func compareSemver(a, b string) bool {
+	if a == "latest" {
+		return true
+	}
+	if b == "latest" {
+		return false
+	}
+
+	cleanA := strings.TrimPrefix(strings.ToLower(a), "v")
+	cleanB := strings.TrimPrefix(strings.ToLower(b), "v")
+
+	// 提取主版本部分（去除 -beta, -rc 等后缀以比较主版本号）
+	mainA := strings.Split(cleanA, "-")[0]
+	mainB := strings.Split(cleanB, "-")[0]
+
+	partsA := strings.Split(mainA, ".")
+	partsB := strings.Split(mainB, ".")
+
+	maxLen := len(partsA)
+	if len(partsB) > maxLen {
+		maxLen = len(partsB)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var numA, numB int64
+		var errA, errB error
+		if i < len(partsA) {
+			numA, errA = strconv.ParseInt(partsA[i], 10, 64)
+		}
+		if i < len(partsB) {
+			numB, errB = strconv.ParseInt(partsB[i], 10, 64)
+		}
+
+		// 若两者当前位均为纯数字段
+		if errA == nil && errB == nil {
+			if numA != numB {
+				return numA > numB
+			}
+		} else {
+			// 非纯数字段回退到字符比较
+			strA := ""
+			if i < len(partsA) {
+				strA = partsA[i]
+			}
+			strB := ""
+			if i < len(partsB) {
+				strB = partsB[i]
+			}
+			if strA != strB {
+				return strA > strB
+			}
+		}
+	}
+
+	// 主版本一致时，正式版优先于预发布版本 (-beta, -alpha)
+	hasPreA := strings.Contains(cleanA, "-")
+	hasPreB := strings.Contains(cleanB, "-")
+	if hasPreA != hasPreB {
+		return !hasPreA // 无 prerelease 的（即稳定正式版）优先排在前面
+	}
+
+	return cleanA > cleanB
+}
+
 // fetchTagsFromRegistryDirect 直接从官方 Docker Registry v2 接口获取真实 tags 列表
 func fetchTagsFromRegistryDirect(ctx context.Context, registry, repository string) []string {
 	var targetURL string
@@ -735,9 +801,9 @@ func fetchTagsFromRegistryDirect(ctx context.Context, registry, repository strin
 		validTags = append(validTags, t)
 	}
 
-	// 语义化倒序排列（使如 v1.11.7, v1.11.1 这种最新稳定版本排在最前面）
+	// 语义化倒序排列（使如 v1.12.8, v1.11.1 这种最新稳定版本排在最前面，而非按字符 ASCII 排序）
 	sort.SliceStable(validTags, func(i, j int) bool {
-		return validTags[i] > validTags[j]
+		return compareSemver(validTags[i], validTags[j])
 	})
 
 	return validTags
