@@ -183,6 +183,52 @@ func normalizeRepository(repo *Repository) {
 	}
 }
 
+// searchQuay 搜索 Quay.io 镜像
+func searchQuay(ctx context.Context, query string, page, pageSize int) (*SearchResult, error) {
+	url := fmt.Sprintf("https://quay.io/api/v1/find/repositories?query=%s", url.QueryEscape(query))
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := utils.GetSearchHTTPClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var quayResp struct {
+		Results []struct {
+			Namespace struct {
+				Name string `json:"name"`
+			} `json:"namespace"`
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			IsPublic    bool   `json:"is_public"`
+			StarCount   int    `json:"star_count"`
+		} `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&quayResp); err != nil {
+		return nil, err
+	}
+
+	result := &SearchResult{
+		Count: len(quayResp.Results),
+	}
+
+	for _, r := range quayResp.Results {
+		fullName := r.Namespace.Name + "/" + r.Name
+		result.Results = append(result.Results, Repository{
+			Name:        fullName,
+			Description: r.Description,
+			StarCount:   r.StarCount,
+			IsOfficial:  false,
+		})
+	}
+	return result, nil
+}
+
 // searchDockerHub 搜索镜像
 func searchDockerHub(ctx context.Context, query string, page, pageSize int) (*SearchResult, error) {
 	return searchDockerHubWithDepth(ctx, query, page, pageSize, 0)
@@ -471,11 +517,25 @@ func RegisterSearchRoute(r *gin.Engine) {
 	r.GET("/search", func(c *gin.Context) {
 		query := c.Query("q")
 		if query == "" {
+			query = c.Query("query")
+		}
+		if query == "" {
 			sendErrorResponse(c, "搜索关键词不能为空")
 			return
 		}
 
+		registry := c.DefaultQuery("registry", "docker.io")
 		page, pageSize := parsePaginationParams(c, 25)
+
+		if registry == "quay.io" {
+			result, err := searchQuay(c.Request.Context(), query, page, pageSize)
+			if err != nil {
+				sendErrorResponse(c, err.Error())
+				return
+			}
+			c.JSON(http.StatusOK, result)
+			return
+		}
 
 		result, err := searchDockerHub(c.Request.Context(), query, page, pageSize)
 		if err != nil {
