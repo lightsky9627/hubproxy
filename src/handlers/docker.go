@@ -202,6 +202,27 @@ func ProxyDockerRegistryGin(c *gin.Context) {
 		}
 	}
 
+	// 检查二级专属域名是否直接合法（如果是专属域名用户，/v2/ 探测也视为登录成功）
+	reqHost := c.Request.Host
+	if colonIdx := strings.Index(reqHost, ":"); colonIdx != -1 {
+		reqHost = reqHost[:colonIdx]
+	}
+	hostParts := strings.Split(reqHost, ".")
+	if len(hostParts) >= 3 {
+		sub := hostParts[0]
+		if sub != "www" && sub != "hub" && sub != "api" {
+			if user, err := db.GetUserByUsername(sub); err == nil && user != nil && user.IsEnabled {
+				if user.ExpiresAt == nil || time.Now().Before(*user.ExpiresAt) {
+					if path == "/v2/" {
+						c.Header("Docker-Distribution-API-Version", "registry/2.0")
+						c.JSON(http.StatusOK, gin.H{})
+						return
+					}
+				}
+			}
+		}
+	}
+
 	if path == "/v2/" {
 		target, _ := resolveRegistryTarget(c, "")
 		proxyRegistryHTTP(c, target, "/v2/")

@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -61,6 +62,34 @@ func HandleDockerAuthToken(c *gin.Context) {
 	service := c.Query("service")
 	if service == "" {
 		service = target.AuthService
+	}
+
+	// 0. 优先检测二级专属泛域名 (形如 <subdomain>.hub.bravexist.cn)
+	// 专属二级域名无需密码，直接免登录签发对应用户 Token！
+	host := c.Request.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	parts := strings.Split(host, ".")
+	if len(parts) >= 3 {
+		subdomain := parts[0]
+		if subdomain != "www" && subdomain != "hub" && subdomain != "api" {
+			if user, err := db.GetUserByUsername(subdomain); err == nil && user != nil && user.IsEnabled {
+				if user.ExpiresAt == nil || time.Now().Before(*user.ExpiresAt) {
+					access := parseAccessFromScope(scope)
+					token, err := GenerateLocalToken(user.Username, user.IsAdmin, service, access, 4*time.Hour)
+					if err == nil {
+						c.JSON(http.StatusOK, gin.H{
+							"token":        token,
+							"access_token": token,
+							"expires_in":   14400,
+							"issued_at":    time.Now().Format(time.RFC3339),
+						})
+						return
+					}
+				}
+			}
+		}
 	}
 
 	username, password, hasBasic := c.Request.BasicAuth()

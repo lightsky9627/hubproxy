@@ -231,13 +231,19 @@
           const namespace = item.namespace || '';
 
           let displayImage = rawName;
-          if (rawName && !rawName.includes('/')) {
-            if (isOfficial) {
+          if (registry === 'docker.io') {
+            if (rawName && !rawName.includes('/')) {
+              displayImage = isOfficial ? rawName : rawName;
+            }
+          } else {
+            // 非 docker.io 仓库（如 quay.io, ghcr.io, gcr.io 等）
+            if (rawName.startsWith(registry + '/')) {
               displayImage = rawName;
-            } else if (namespace) {
-              displayImage = `${namespace}/${rawName}`;
+            } else {
+              displayImage = `${registry}/${rawName}`;
             }
           }
+
           if (!displayImage) {
             displayImage = 'nginx';
           }
