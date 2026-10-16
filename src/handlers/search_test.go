@@ -18,7 +18,7 @@ func TestNormalizeRepository(t *testing.T) {
 
 	userRepo := &Repository{Name: "owner/app", RepoOwner: "owner"}
 	normalizeRepository(userRepo)
-	if userRepo.Namespace != "owner" || userRepo.Name != "app" {
+	if userRepo.Namespace != "owner" || userRepo.Name != "owner/app" {
 		t.Fatalf("user repo normalized to %#v", userRepo)
 	}
 }

@@ -185,17 +185,20 @@ func normalizeRepository(repo *Repository) {
 			repo.Name = "library/" + repo.Name
 		}
 	} else {
-		if repo.Namespace == "" && repo.RepoOwner != "" {
-			repo.Namespace = repo.RepoOwner
-		}
-
 		if strings.Contains(repo.Name, "/") {
 			parts := strings.Split(repo.Name, "/")
-			if len(parts) > 1 {
-				if repo.Namespace == "" {
-					repo.Namespace = parts[0]
-				}
-				repo.Name = parts[len(parts)-1]
+			if len(parts) > 1 && repo.Namespace == "" {
+				repo.Namespace = parts[0]
+			}
+			// 必须完整保留 repo.Name，例如 "bitnami/nginx"，绝不可截断为 "nginx"！
+		} else {
+			ns := repo.Namespace
+			if ns == "" {
+				ns = repo.RepoOwner
+			}
+			if ns != "" && ns != "library" {
+				repo.Namespace = ns
+				repo.Name = ns + "/" + repo.Name
 			}
 		}
 	}
@@ -387,37 +390,11 @@ func searchDockerHubWithDepth(ctx context.Context, query string, page, pageSize 
 		return cached.(*SearchResult), nil
 	}
 
-	isUserRepo := strings.Contains(query, "/")
-	var namespace, repoName string
-
-	if isUserRepo {
-		parts := strings.Split(query, "/")
-		if len(parts) == 2 {
-			namespace = parts[0]
-			repoName = parts[1]
-		}
-	}
-
-	baseURL := "https://registry.hub.docker.com/v2"
-	var fullURL string
-	var params url.Values
-
-	if isUserRepo && namespace != "" {
-		fullURL = fmt.Sprintf("%s/repositories/%s/", baseURL, namespace)
-		params = url.Values{
-			"page":      {fmt.Sprintf("%d", page)},
-			"page_size": {fmt.Sprintf("%d", pageSize)},
-		}
-	} else {
-		fullURL = baseURL + "/search/repositories/"
-		params = url.Values{
-			"query":     {query},
-			"page":      {fmt.Sprintf("%d", page)},
-			"page_size": {fmt.Sprintf("%d", pageSize)},
-		}
-	}
-
-	fullURL = fullURL + "?" + params.Encode()
+	fullURL := "https://registry.hub.docker.com/v2/search/repositories/?" + url.Values{
+		"query":     {query},
+		"page":      {fmt.Sprintf("%d", page)},
+		"page_size": {fmt.Sprintf("%d", pageSize)},
+	}.Encode()
 
 	resp, err := utils.GetSearchHTTPClient().Get(fullURL)
 	if err != nil {
@@ -435,9 +412,6 @@ func searchDockerHubWithDepth(ctx context.Context, query string, page, pageSize 
 		case http.StatusTooManyRequests:
 			return nil, fmt.Errorf("请求过于频繁，请稍后重试")
 		case http.StatusNotFound:
-			if isUserRepo && namespace != "" {
-				return searchDockerHubWithDepth(ctx, repoName, page, pageSize, depth+1)
-			}
 			return nil, fmt.Errorf("未找到相关镜像")
 		case http.StatusBadGateway, http.StatusServiceUnavailable:
 			return nil, fmt.Errorf("docker hub 服务暂时不可用，请稍后重试")
@@ -446,58 +420,13 @@ func searchDockerHubWithDepth(ctx context.Context, query string, page, pageSize 
 		}
 	}
 
-	var result *SearchResult
-	if isUserRepo && namespace != "" {
-		var userRepos struct {
-			Count    int          `json:"count"`
-			Next     string       `json:"next"`
-			Previous string       `json:"previous"`
-			Results  []Repository `json:"results"`
-		}
-		if err := json.Unmarshal(body, &userRepos); err != nil {
-			return nil, fmt.Errorf("解析响应失败: %v", err)
-		}
+	result := &SearchResult{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %v", err)
+	}
 
-		result = &SearchResult{
-			Count:    userRepos.Count,
-			Next:     userRepos.Next,
-			Previous: userRepos.Previous,
-			Results:  make([]Repository, 0),
-		}
-
-		for _, repo := range userRepos.Results {
-			if repoName == "" || strings.Contains(strings.ToLower(repo.Name), strings.ToLower(repoName)) {
-				repo.Namespace = namespace
-				normalizeRepository(&repo)
-				result.Results = append(result.Results, repo)
-			}
-		}
-
-		if len(result.Results) == 0 {
-			return searchDockerHubWithDepth(ctx, repoName, page, pageSize, depth+1)
-		}
-
-		result.Count = len(result.Results)
-	} else {
-		result = &SearchResult{}
-		if err := json.Unmarshal(body, &result); err != nil {
-			return nil, fmt.Errorf("解析响应失败: %v", err)
-		}
-
-		for i := range result.Results {
-			normalizeRepository(&result.Results[i])
-		}
-
-		if isUserRepo && namespace != "" {
-			filteredResults := make([]Repository, 0)
-			for _, repo := range result.Results {
-				if strings.EqualFold(repo.Namespace, namespace) {
-					filteredResults = append(filteredResults, repo)
-				}
-			}
-			result.Results = filteredResults
-			result.Count = len(filteredResults)
-		}
+	for i := range result.Results {
+		normalizeRepository(&result.Results[i])
 	}
 
 	searchCache.Set(cacheKey, result)
