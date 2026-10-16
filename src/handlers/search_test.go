@@ -21,6 +21,12 @@ func TestNormalizeRepository(t *testing.T) {
 	if userRepo.Namespace != "owner" || userRepo.Name != "owner/app" {
 		t.Fatalf("user repo normalized to %#v", userRepo)
 	}
+
+	communityRepo := &Repository{Name: "openlist", Namespace: "openlistteam", IsOfficial: false}
+	normalizeRepository(communityRepo)
+	if communityRepo.Namespace != "openlistteam" || communityRepo.Name != "openlistteam/openlist" {
+		t.Fatalf("community repo normalized to %#v", communityRepo)
+	}
 }
 
 func TestParsePaginationParams(t *testing.T) {

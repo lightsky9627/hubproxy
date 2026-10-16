@@ -387,7 +387,11 @@ func searchDockerHubWithDepth(ctx context.Context, query string, page, pageSize 
 	cacheKey := fmt.Sprintf("search:%s:%d:%d", query, page, pageSize)
 
 	if cached, ok := searchCache.Get(cacheKey); ok {
-		return cached.(*SearchResult), nil
+		cachedResult := cached.(*SearchResult)
+		for i := range cachedResult.Results {
+			normalizeRepository(&cachedResult.Results[i])
+		}
+		return cachedResult, nil
 	}
 
 	fullURL := "https://registry.hub.docker.com/v2/search/repositories/?" + url.Values{

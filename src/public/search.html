@@ -1129,6 +1129,11 @@ docker pull ghcr.hub.bravexist.cn/home-assistant/core:latest</pre>
           const stars = item.star_count || 0;
           const desc = item.short_description || item.description || '暂无详细描述';
           let rawName = (item.repo_name || item.name || '').trim();
+          const ns = (item.namespace || item.repo_owner || '').trim();
+          // 如果是非官方镜像且存在明确的命名空间/组织名，且 rawName 尚未包含 '/'，则自动补全命名空间
+          if (!isOfficial && ns && ns !== 'library' && !rawName.includes('/')) {
+            rawName = `${ns}/${rawName}`;
+          }
 
           // 严格防止空镜像名
           if (!rawName || rawName === registry || rawName === registry + '/') {
